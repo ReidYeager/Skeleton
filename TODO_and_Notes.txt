@@ -1,0 +1,2 @@
+\Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.h
+	 TODO :--: Line    16 :--: // TODO : Move all SDL stuff to its own file

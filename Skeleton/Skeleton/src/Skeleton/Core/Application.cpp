@@ -7,4 +7,5 @@
 void skeleton::Application::Init()
 {
 	renderer = new Renderer();
+	delete(renderer);
 }

@@ -19,12 +19,26 @@ private:
 
 	VkInstance instance;
 	VkSurfaceKHR surface;
+	std::vector<const char*> validationLayer    = { "VK_LAYER_KHRONOS_validation" };
+	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
+	std::vector<const char*> deviceExtensions   = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 	VkDevice device;
 	VkPhysicalDevice physicalDevice;
 
+	uint32_t graphicsQueueIndex = -1;
+	uint32_t presentQueueIndex  = -1;
+	uint32_t transferQueueIndex = -1;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 	VkQueue transferQueue;
+
+	VkCommandPool graphicsPool;
+
+	VkFormat swapchainFormat;
+	VkExtent2D swapchainExtent;
+	VkSwapchainKHR swapchain;
+	std::vector<VkImage> swapchainImages;
+	std::vector<VkImageView> swapchainImageViews;
 
 //////////////////////////////////////////////////////////////////////////
 // Functions
@@ -76,7 +90,7 @@ protected:
 	void CreatePipelineLayout();
 	void CreatePipeline();
 	void CreateDepthImage();
-	void CreateFrameBuffer();
+	void CreateFrameBuffers();
 
 	void RecordCommandBuffers();
 
@@ -92,6 +106,12 @@ protected:
 		const VkPhysicalDevice* _device,
 		uint32_t _queuePropertyCount,
 		uint32_t _graphicsIndex);
+
+	//VkImage CreateImage();
+
+	VkImageView CreateImageView(
+		const VkFormat _format,
+		const VkImage& _image);
 
 }; // Renderer
 } // namespace skeleton

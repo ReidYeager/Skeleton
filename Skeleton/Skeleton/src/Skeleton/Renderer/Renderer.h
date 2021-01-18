@@ -40,6 +40,24 @@ private:
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
 
+	VkImage depthImage;
+	VkImageView depthImageView;
+
+	VkRenderPass renderpass;
+	VkPipelineLayout pipelineLayout;
+	VkPipeline pipeline;
+
+	std::vector<VkFramebuffer> frameBuffers;
+	std::vector<VkCommandBuffer> commandBuffers;
+
+	#define MAX_FLIGHT_IMAGE_COUNT 3
+	std::vector<VkFence> imageIsInFlightFences;
+	std::vector<VkFence> flightFences;
+	std::vector<VkSemaphore> renderCompleteSemaphores;
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	uint32_t currentFrame = 0;
+
+
 //////////////////////////////////////////////////////////////////////////
 // Functions
 //////////////////////////////////////////////////////////////////////////
@@ -112,6 +130,9 @@ protected:
 	VkImageView CreateImageView(
 		const VkFormat _format,
 		const VkImage& _image);
+
+	VkShaderModule CreateShaderModule(
+		const char* _directory);
 
 }; // Renderer
 } // namespace skeleton

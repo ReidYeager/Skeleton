@@ -7,6 +7,7 @@
 
 #include "Renderer.h"
 #include "../Core/Common.h"
+#include "../Core/AssetLoader.h"
 
 //////////////////////////////////////////////////////////////////////////
 // Initialize & Cleanup
@@ -32,12 +33,17 @@ skeleton::Renderer::Renderer()
 
 	CreateSyncObjects();
 	CreateCommandBuffers();
+	RecordCommandBuffers();
+
+	SKL_PRINT(End Init, "-------------------------------------------------");
 
 	bool stayOpen = true;
 	SDL_Event e;
 
 	while (stayOpen)
 	{
+		RenderFrame();
+
 		while (SDL_PollEvent(&e) != 0)
 		{
 			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE))
@@ -46,11 +52,20 @@ skeleton::Renderer::Renderer()
 			}
 		}
 	}
+
+	vkDeviceWaitIdle(device);
 }
 
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
+	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
+	{
+		vkDestroyFence(device, flightFences[i], nullptr);
+		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(device, renderCompleteSemaphores[i], nullptr);
+	}
+
 	CleanupRenderer();
 
 	vkDestroyCommandPool(device, graphicsPool, nullptr);
@@ -68,7 +83,46 @@ skeleton::Renderer::~Renderer()
 
 void skeleton::Renderer::RenderFrame()
 {
+	vkWaitForFences(device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+	if (imageIsInFlightFences[imageIndex] != VK_NULL_HANDLE)
+	{
+		vkWaitForFences(device, 1, &imageIsInFlightFences[imageIndex], VK_TRUE, UINT64_MAX);
+	}
+	imageIsInFlightFences[imageIndex] = flightFences[currentFrame];
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrame];
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = &renderCompleteSemaphores[currentFrame];
+
+	vkResetFences(device, 1, &flightFences[currentFrame]);
+
+	SKL_ASSERT_VK(
+		vkQueueSubmit(graphicsQueue, 1, &submitInfo, flightFences[currentFrame]),
+		"Failed to submit draw command");
+
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = &renderCompleteSemaphores[currentFrame];
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = &swapchain;
+	presentInfo.pImageIndices = &imageIndex;
+
+	vkQueuePresentKHR(presentQueue, &presentInfo);
+
+	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -86,11 +140,20 @@ void skeleton::Renderer::CreateRenderer()
 	CreateDepthImage();
 	CreateFrameBuffers();
 
-	RecordCommandBuffers();
+	//RecordCommandBuffers();
 }
 
 void skeleton::Renderer::CleanupRenderer()
 {
+	for (uint32_t i = 0; i < (uint32_t)frameBuffers.size(); i++)
+	{
+		vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
+	}
+
+	vkDestroyPipeline(device, pipeline, nullptr);
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	vkDestroyRenderPass(device, renderpass, nullptr);
+
 	for (const auto& view : swapchainImageViews)
 	{
 		vkDestroyImageView(device, view, nullptr);
@@ -214,11 +277,22 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 
 	uint32_t propertyCount;
 
+	struct BestGPU
+	{
+		VkPhysicalDevice device;
+		uint32_t graphicsIndex;
+		uint32_t presentIndex;
+		uint32_t transferIndex;
+	} bestFit;
+
 	for (const auto& pdevice : physDevices)
 	{
 		vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &propertyCount, nullptr);
 		std::vector<VkQueueFamilyProperties> queueProperties(propertyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &propertyCount, queueProperties.data());
+
+		VkPhysicalDeviceProperties props;
+		vkGetPhysicalDeviceProperties(pdevice, &props);
 
 		uint32_t extensionCount;
 		vkEnumerateDeviceExtensionProperties(pdevice, nullptr, &extensionCount, nullptr);
@@ -242,9 +316,28 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 			_presentIndex != -1 &&
 			_transferIndex != -1)
 		{
-			_selectedDevice = pdevice;
-			return;
+			if (_graphicsIndex == _presentIndex || _graphicsIndex == _transferIndex || _presentIndex == _transferIndex)
+			{
+				bestFit.device = pdevice;
+				bestFit.graphicsIndex = _graphicsIndex;
+				bestFit.presentIndex = _presentIndex;
+				bestFit.transferIndex = _transferIndex;
+			}
+			else
+			{
+				_selectedDevice = pdevice;
+				return;
+			}
 		}
+	}
+
+	if (bestFit.device != VK_NULL_HANDLE)
+	{
+		_selectedDevice = bestFit.device;
+		_graphicsIndex = bestFit.graphicsIndex;
+		_presentIndex = bestFit.presentIndex;
+		_transferIndex = bestFit.transferIndex;
+		return;
 	}
 
 	SKL_ASSERT_VK(VK_ERROR_UNKNOWN, "Failed to find a suitable physical device");
@@ -263,12 +356,46 @@ void skeleton::Renderer::CreateCommandPools()
 
 void skeleton::Renderer::CreateSyncObjects()
 {
-	
+	imageIsInFlightFences.resize(swapchainImages.size(), VK_NULL_HANDLE);
+	flightFences.resize(MAX_FLIGHT_IMAGE_COUNT);
+	imageAvailableSemaphores.resize(MAX_FLIGHT_IMAGE_COUNT);
+	renderCompleteSemaphores.resize(MAX_FLIGHT_IMAGE_COUNT);
+
+	VkSemaphoreCreateInfo semaphoreInfo = {};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	VkFenceCreateInfo fenceInfo = {};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
+	{
+		SKL_ASSERT_VK(
+			vkCreateFence(device, &fenceInfo, nullptr, &flightFences[i]),
+			"Failed to create sync fence");
+		SKL_ASSERT_VK(
+			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]),
+			"Failed to create image semaphore");
+		SKL_ASSERT_VK(
+			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderCompleteSemaphores[i]),
+			"Failed to create render semaphore");
+	}
 }
 
 void skeleton::Renderer::CreateCommandBuffers()
 {
+	uint32_t bufferCount = static_cast<uint32_t>(swapchainImages.size());
+	commandBuffers.resize(bufferCount);
 
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = bufferCount;
+	allocInfo.commandPool = graphicsPool;
+
+	SKL_ASSERT_VK(
+		vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()),
+		"Failed to allocate command buffers");
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -381,18 +508,169 @@ void skeleton::Renderer::CreateSwapchain()
 
 void skeleton::Renderer::CreateRenderpass()
 {
-	//VkRenderPassCreateInfo createInfo = {};
-	//createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	VkAttachmentDescription colorDesc = {};
+	colorDesc.format = swapchainFormat;
+	colorDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	//colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	colorDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+	VkAttachmentReference colorRef;
+	colorRef.attachment = 0;
+	colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorRef;
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+
+	VkRenderPassCreateInfo creteInfo = {};
+	creteInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	creteInfo.attachmentCount = 1;
+	creteInfo.pAttachments = &colorDesc;
+	creteInfo.subpassCount = 1;
+	creteInfo.pSubpasses = &subpass;
+
+	SKL_ASSERT_VK(
+		vkCreateRenderPass(device, &creteInfo, nullptr, &renderpass),
+		"Failed to create renderpass");
 }
 
 void skeleton::Renderer::CreatePipelineLayout()
 {
+	//Pipeline Layout/////////////////////////////////////////////////////////
+	VkPipelineLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutInfo.setLayoutCount = 0;
+	layoutInfo.pSetLayouts = nullptr;
+	layoutInfo.pushConstantRangeCount = 0;
+	layoutInfo.pPushConstantRanges = nullptr;
 
+	SKL_ASSERT_VK(
+		vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout),
+		"Failed to create pipeline layout");
 }
 
 void skeleton::Renderer::CreatePipeline()
 {
+	//Viewport State//////////////////////////////////////////////////////////
+	VkViewport viewport;
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = (float)swapchainExtent.width;
+	viewport.height = (float)swapchainExtent.height;
+	viewport.minDepth = 0;
+	viewport.maxDepth = 1;
 
+	VkRect2D scissor = {};
+	scissor.extent = swapchainExtent;
+	scissor.offset = { 0, 0 };
+
+	VkPipelineViewportStateCreateInfo viewportStateInfo = {};
+	viewportStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportStateInfo.scissorCount = 1;
+	viewportStateInfo.pScissors = &scissor;
+	viewportStateInfo.viewportCount = 1;
+	viewportStateInfo.pViewports = &viewport;
+
+	//Vert Input State////////////////////////////////////////////////////////
+	VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {};
+	vertexInputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputStateInfo.vertexAttributeDescriptionCount = 0;
+	vertexInputStateInfo.pVertexAttributeDescriptions = nullptr;
+	vertexInputStateInfo.vertexBindingDescriptionCount = 0;
+	vertexInputStateInfo.pVertexBindingDescriptions = nullptr;
+
+	//Input Assembly//////////////////////////////////////////////////////////
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo = {};
+	inputAssemblyStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssemblyStateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssemblyStateInfo.primitiveRestartEnable = VK_FALSE;
+
+	//Rasterizer//////////////////////////////////////////////////////////////
+	VkPipelineRasterizationStateCreateInfo rasterStateInfo = {};
+	rasterStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterStateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterStateInfo.rasterizerDiscardEnable = VK_TRUE;
+	rasterStateInfo.lineWidth = 1.f;
+	rasterStateInfo.depthBiasEnable = VK_FALSE;
+	rasterStateInfo.depthClampEnable = VK_FALSE;
+	rasterStateInfo.rasterizerDiscardEnable = VK_FALSE;
+
+	//Multisample State///////////////////////////////////////////////////////
+	VkPipelineMultisampleStateCreateInfo multisampleStateInfo = {};
+	multisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampleStateInfo.sampleShadingEnable = VK_FALSE;
+
+	//Depth State/////////////////////////////////////////////////////////////
+	VkPipelineDepthStencilStateCreateInfo depthStateInfo = {};
+
+	//Color Blend State///////////////////////////////////////////////////////
+	VkPipelineColorBlendAttachmentState blendAttachmentState = {};
+	blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	blendAttachmentState.blendEnable = VK_FALSE;
+
+	VkPipelineColorBlendStateCreateInfo blendStateInfo = {};
+	blendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	blendStateInfo.logicOpEnable = VK_FALSE;
+	blendStateInfo.attachmentCount = 1;
+	blendStateInfo.pAttachments = &blendAttachmentState;
+
+	//Dynamic states//////////////////////////////////////////////////////////
+	VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
+	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateInfo.dynamicStateCount = 0;
+	dynamicStateInfo.pDynamicStates = nullptr;
+
+	//Shader modules//////////////////////////////////////////////////////////
+	VkShaderModule vertModule = CreateShaderModule("res\\default_vert.spv");
+	VkShaderModule fragModule = CreateShaderModule("res\\default_frag.spv");
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+	//Pipeline////////////////////////////////////////////////////////////////
+	VkGraphicsPipelineCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	createInfo.pViewportState = &viewportStateInfo;
+	createInfo.pVertexInputState = &vertexInputStateInfo;
+	createInfo.pInputAssemblyState = &inputAssemblyStateInfo;
+	createInfo.pRasterizationState = &rasterStateInfo;
+	createInfo.pMultisampleState = &multisampleStateInfo;
+	createInfo.pDepthStencilState = nullptr; //&depthStateInfo;
+	createInfo.pColorBlendState = &blendStateInfo;
+	createInfo.pDynamicState = &dynamicStateInfo;
+
+	createInfo.stageCount = 2;
+	createInfo.pStages = shaderStages;
+
+	createInfo.layout = pipelineLayout;
+	createInfo.renderPass = renderpass;
+
+	SKL_ASSERT_VK(
+		vkCreateGraphicsPipelines(device, nullptr, 1, &createInfo, nullptr, &pipeline),
+		"Failed to create graphics pipeline");
+
+	vkDestroyShaderModule(device, vertModule, nullptr);
+	vkDestroyShaderModule(device, fragModule, nullptr);
 }
 
 void skeleton::Renderer::CreateDepthImage()
@@ -402,12 +680,63 @@ void skeleton::Renderer::CreateDepthImage()
 
 void skeleton::Renderer::CreateFrameBuffers()
 {
+	VkFramebufferCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	createInfo.renderPass = renderpass;
+	createInfo.layers = 1;
+	createInfo.attachmentCount = 1;
+	createInfo.width = swapchainExtent.width;
+	createInfo.height = swapchainExtent.height;
 
+	uint32_t imageCount = swapchainImageViews.size();
+	frameBuffers.resize(imageCount);
+
+	for (uint32_t i = 0; i < imageCount; i++)
+	{
+		createInfo.pAttachments = &swapchainImageViews[i];
+
+		SKL_ASSERT_VK(
+			vkCreateFramebuffer(device, &createInfo, nullptr, &frameBuffers[i]),
+			"Failed to create a framebuffer");
+	}
 }
 
 void skeleton::Renderer::RecordCommandBuffers()
 {
+	uint32_t comandCount = static_cast<uint32_t>(commandBuffers.size());
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
+	VkClearValue clearValues[1] = {};
+	clearValues[0].color = {0.0f, 1.0f, 0.0f, 1.0f};
+	//clearValues[1].depthStencil = {1, 0};
+
+	VkRenderPassBeginInfo rpBeginInfo = {};
+	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	rpBeginInfo.renderPass = renderpass;
+	rpBeginInfo.clearValueCount = 1;
+	rpBeginInfo.pClearValues = clearValues;
+	rpBeginInfo.renderArea.extent = swapchainExtent;
+	rpBeginInfo.renderArea.offset = {0, 0};
+
+	for (uint32_t i = 0; i < comandCount; i++)
+	{
+		rpBeginInfo.framebuffer = frameBuffers[i];
+
+		SKL_ASSERT_VK(
+			vkBeginCommandBuffer(commandBuffers[i], &beginInfo),
+			"Failed to begin a command buffer");
+
+		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
+		vkCmdEndRenderPass(commandBuffers[i]);
+
+		SKL_ASSERT_VK(
+			vkEndCommandBuffer(commandBuffers[i]),
+			"Failed to end command buffer");
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -452,6 +781,7 @@ uint32_t skeleton::Renderer::GetPresentIndex(
 {
 	uint32_t bestfit = -1;
 	VkBool32 supported;
+
 
 	for (uint32_t i = 0; i < _queuePropertyCount; i++)
 	{
@@ -520,4 +850,21 @@ VkImageView skeleton::Renderer::CreateImageView(
 
 	return tmpView;
 }
+
+VkShaderModule skeleton::Renderer::CreateShaderModule(
+	const char* _directory)
+{
+	std::vector<char> shaderSource = skeleton::tools::LoadFileAsString(_directory);
+	VkShaderModuleCreateInfo moduleCreateInfo = {};
+	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	moduleCreateInfo.codeSize = shaderSource.size();
+	moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderSource.data());
+	VkShaderModule tmpModule;
+	SKL_ASSERT_VK(
+		vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &tmpModule),
+		"Failed to create shader module");
+
+	return tmpModule;
+}
+
 

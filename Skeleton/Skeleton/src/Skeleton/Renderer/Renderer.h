@@ -5,14 +5,18 @@
 #include "vulkan/vulkan.h"
 #include "sdl/SDL.h"
 #include "sdl/SDL_vulkan.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
+#include "VulkanDevice.h"
 
 namespace skeleton
 {
 class Renderer
 {
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // Variables
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 private:
 	// TODO : Move all SDL stuff to its own file
 	SDL_Window* window;
@@ -22,15 +26,7 @@ private:
 	std::vector<const char*> validationLayer    = { "VK_LAYER_KHRONOS_validation" };
 	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
 	std::vector<const char*> deviceExtensions   = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	VkDevice device;
-	VkPhysicalDevice physicalDevice;
-
-	uint32_t graphicsQueueIndex = -1;
-	uint32_t presentQueueIndex  = -1;
-	uint32_t transferQueueIndex = -1;
-	VkQueue graphicsQueue;
-	VkQueue presentQueue;
-	VkQueue transferQueue;
+	VulkanDevice* device;
 
 	VkCommandPool graphicsPool;
 
@@ -42,6 +38,17 @@ private:
 
 	VkImage depthImage;
 	VkImageView depthImageView;
+
+	struct MVPMatrices {
+		glm::mat4 model;
+		glm::mat4 view;
+		glm::mat4 proj;
+	} mvp;
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkBuffer mvpBuffer;
+	VkDeviceMemory mvpMemory;
+	VkDescriptorPool descriptorPool;
+	VkDescriptorSet descriptorSet;
 
 	VkRenderPass renderpass;
 	VkPipelineLayout pipelineLayout;
@@ -57,30 +64,43 @@ private:
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	uint32_t currentFrame = 0;
 
+	VkBuffer vertBuffer;
+	VkDeviceMemory vertMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexMemory;
 
-//////////////////////////////////////////////////////////////////////////
+
+//=================================================
 // Functions
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 public:
-// Initialization & Cleanup //////////////////////////////////////////////
+	// Initialization & Cleanup
+	//=================================================
 
 	// Initializes the renderer in its entirety
 	Renderer();
 	// Cleans up all vulkan objects
 	~Renderer();
 
-// Runtime ///////////////////////////////////////////////////////////////
+	// Runtime
+	//=================================================
 
 	void RenderFrame();
 
+	void CreateDescriptorSetLayout();
+	void CreateDescriptorPool();
+	void CreateDescriptorSet();
+
 protected:
-// Create Renderer ///////////////////////////////////////////////////////
+	// Create Renderer
+	//=================================================
 
 	void CreateRenderer();
 	void CleanupRenderer();
 	void RecreateRenderer();
 
-// Initializers //////////////////////////////////////////////////////////
+	// Initializers
+	//=================================================
 
 	// Pre-renderer creation
 
@@ -101,7 +121,8 @@ protected:
 	void CreateSyncObjects();
 	void CreateCommandBuffers();
 
-// Create Renderer Functions /////////////////////////////////////////////
+	// Create Renderer Functions
+	//=================================================
 
 	void CreateSwapchain();
 	void CreateRenderpass();
@@ -112,7 +133,8 @@ protected:
 
 	void RecordCommandBuffers();
 
-// Helpers ///////////////////////////////////////////////////////////////
+	// Helpers
+	//=================================================
 
 	// Returns the first instance of a queue with the input flags
 	uint32_t GetQueueIndex(
@@ -125,7 +147,12 @@ protected:
 		uint32_t _queuePropertyCount,
 		uint32_t _graphicsIndex);
 
-	//VkImage CreateImage();
+	void CreateImage(
+		const VkExtent2D _extent,
+		const VkFormat _format,
+		const VkImageLayout _layout,
+		VkImage& _image,
+		VkImageView& _view);
 
 	VkImageView CreateImageView(
 		const VkFormat _format,
@@ -133,6 +160,8 @@ protected:
 
 	VkShaderModule CreateShaderModule(
 		const char* _directory);
+
+	void CreateModelBuffers();
 
 }; // Renderer
 } // namespace skeleton

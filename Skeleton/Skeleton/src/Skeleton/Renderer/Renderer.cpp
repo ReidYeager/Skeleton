@@ -2,12 +2,33 @@
 #include "pch.h"
 #include <set>
 #include <string>
-
-#include "glm/glm.hpp"
+#include <chrono>
 
 #include "Renderer.h"
-#include "../Core/Common.h"
-#include "../Core/AssetLoader.h"
+#include "Skeleton/Core/Common.h"
+#include "Skeleton/Core/AssetLoader.h"
+
+#include "Skeleton/Core/Vertex.h"
+
+const std::vector<skeleton::Vertex> verts = {
+	{{-0.25f, -0.5f, 1.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}},
+	{{ 0.25f,  0.5f, 1.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}},
+	{{-0.75f,  0.5f, 1.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}},
+	{{ 0.75f, -0.5f, 1.0f}, {1.f, 1.f, 1.f}},
+
+	{{ 0.25f, -0.5f, 0.5f}, {1.f, 0.f, 0.f}},
+	{{-0.25f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}},
+	{{ 0.75f,  0.5f, 0.5f}, {0.f, 0.f, 1.f}},
+	{{-0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}}
+};
+
+const std::vector<uint32_t> indices = {
+	0, 1, 2,
+	0, 3, 1,
+
+	4, 6, 5,
+	4, 5, 7
+};
 
 //////////////////////////////////////////////////////////////////////////
 // Initialize & Cleanup
@@ -29,8 +50,13 @@ skeleton::Renderer::Renderer()
 	CreateDevice();
 	CreateCommandPools();
 
+	CreateDescriptorSetLayout();
+
 	CreateRenderer();
 
+	CreateModelBuffers();
+	CreateDescriptorPool();
+	CreateDescriptorSet();
 	CreateSyncObjects();
 	CreateCommandBuffers();
 	RecordCommandBuffers();
@@ -40,8 +66,20 @@ skeleton::Renderer::Renderer()
 	bool stayOpen = true;
 	SDL_Event e;
 
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
 	while (stayOpen)
 	{
+		auto curTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
+
+		mvp.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
+		mvp.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
+		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
+		mvp.proj[1][1] *= -1;
+
+		device->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
+
 		RenderFrame();
 
 		while (SDL_PollEvent(&e) != 0)
@@ -53,24 +91,34 @@ skeleton::Renderer::Renderer()
 		}
 	}
 
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(*device);
 }
 
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
+	vkFreeMemory(*device, vertMemory, nullptr);
+	vkDestroyBuffer(*device, vertBuffer, nullptr);
+	vkFreeMemory(*device, indexMemory, nullptr);
+	vkDestroyBuffer(*device, indexBuffer, nullptr);
+
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
-		vkDestroyFence(device, flightFences[i], nullptr);
-		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-		vkDestroySemaphore(device, renderCompleteSemaphores[i], nullptr);
+		vkDestroyFence(*device, flightFences[i], nullptr);
+		vkDestroySemaphore(*device, imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(*device, renderCompleteSemaphores[i], nullptr);
 	}
+
+	vkDestroyBuffer(*device, mvpBuffer, nullptr);
+	vkFreeMemory(*device, mvpMemory, nullptr);
+	vkDestroyDescriptorSetLayout(*device, descriptorSetLayout, nullptr);
+	vkDestroyDescriptorPool(*device, descriptorPool, nullptr);
 
 	CleanupRenderer();
 
-	vkDestroyCommandPool(device, graphicsPool, nullptr);
+	vkDestroyCommandPool(*device, graphicsPool, nullptr);
 
-	vkDestroyDevice(device, nullptr);
+	delete(device);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 
@@ -83,14 +131,14 @@ skeleton::Renderer::~Renderer()
 
 void skeleton::Renderer::RenderFrame()
 {
-	vkWaitForFences(device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	vkWaitForFences(*device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+	vkAcquireNextImageKHR(*device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 	if (imageIsInFlightFences[imageIndex] != VK_NULL_HANDLE)
 	{
-		vkWaitForFences(device, 1, &imageIsInFlightFences[imageIndex], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(*device, 1, &imageIsInFlightFences[imageIndex], VK_TRUE, UINT64_MAX);
 	}
 	imageIsInFlightFences[imageIndex] = flightFences[currentFrame];
 
@@ -106,10 +154,10 @@ void skeleton::Renderer::RenderFrame()
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &renderCompleteSemaphores[currentFrame];
 
-	vkResetFences(device, 1, &flightFences[currentFrame]);
+	vkResetFences(*device, 1, &flightFences[currentFrame]);
 
 	SKL_ASSERT_VK(
-		vkQueueSubmit(graphicsQueue, 1, &submitInfo, flightFences[currentFrame]),
+		vkQueueSubmit(device->graphicsQueue, 1, &submitInfo, flightFences[currentFrame]),
 		"Failed to submit draw command");
 
 	VkPresentInfoKHR presentInfo = {};
@@ -120,9 +168,78 @@ void skeleton::Renderer::RenderFrame()
 	presentInfo.pSwapchains = &swapchain;
 	presentInfo.pImageIndices = &imageIndex;
 
-	vkQueuePresentKHR(presentQueue, &presentInfo);
+	vkQueuePresentKHR(device->presentQueue, &presentInfo);
 
 	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
+}
+
+void skeleton::Renderer::CreateDescriptorSetLayout()
+{
+	VkDescriptorSetLayoutBinding mvpBinding = {};
+	mvpBinding.binding = 0;
+	mvpBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	mvpBinding.descriptorCount = 1;
+	mvpBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	mvpBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	createInfo.bindingCount = 1;
+	createInfo.pBindings = &mvpBinding;
+
+	SKL_ASSERT_VK(
+		vkCreateDescriptorSetLayout(*device, &createInfo, nullptr, &descriptorSetLayout),
+		"Failed to create descriptor set layout");
+}
+
+void skeleton::Renderer::CreateDescriptorPool()
+{
+	VkDescriptorPoolSize poolSize = {};
+	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	createInfo.poolSizeCount = 1;
+	createInfo.pPoolSizes = &poolSize;
+	createInfo.maxSets = 1;
+
+	SKL_ASSERT_VK(
+		vkCreateDescriptorPool(*device, &createInfo, nullptr, &descriptorPool),
+		"Failed to create descriptor pool");
+}
+
+void skeleton::Renderer::CreateDescriptorSet()
+{
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &descriptorSetLayout;
+
+	SKL_ASSERT_VK(
+		vkAllocateDescriptorSets(*device, &allocInfo, &descriptorSet),
+		"Failed to allocate descriptor set");
+
+	// 
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = mvpBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = VK_WHOLE_SIZE;
+
+	VkWriteDescriptorSet descWrite = {};
+	descWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descWrite.dstSet = descriptorSet;
+	descWrite.dstBinding = 0;
+	descWrite.dstArrayElement = 0;
+	descWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descWrite.descriptorCount = 1;
+	descWrite.pBufferInfo = &bufferInfo;
+	descWrite.pImageInfo = nullptr;
+	descWrite.pTexelBufferView = nullptr;
+
+	vkUpdateDescriptorSets(*device, 1, &descWrite, 0, nullptr);
+
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -133,6 +250,8 @@ void skeleton::Renderer::CreateRenderer()
 {
 	CreateSwapchain();
 	CreateRenderpass();
+
+	CreateDepthImage();
 
 	CreatePipelineLayout();
 	CreatePipeline();
@@ -147,24 +266,24 @@ void skeleton::Renderer::CleanupRenderer()
 {
 	for (uint32_t i = 0; i < (uint32_t)frameBuffers.size(); i++)
 	{
-		vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
+		vkDestroyFramebuffer(*device, frameBuffers[i], nullptr);
 	}
 
-	vkDestroyPipeline(device, pipeline, nullptr);
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	vkDestroyRenderPass(device, renderpass, nullptr);
+	vkDestroyPipeline(*device, pipeline, nullptr);
+	vkDestroyPipelineLayout(*device, pipelineLayout, nullptr);
+	vkDestroyRenderPass(*device, renderpass, nullptr);
 
 	for (const auto& view : swapchainImageViews)
 	{
-		vkDestroyImageView(device, view, nullptr);
+		vkDestroyImageView(*device, view, nullptr);
 	}
 
-	vkDestroySwapchainKHR(device, swapchain, nullptr);
+	vkDestroySwapchainKHR(*device, swapchain, nullptr);
 }
 
 void skeleton::Renderer::RecreateRenderer()
 {
-	vkDeviceWaitIdle(device);
+	vkDeviceWaitIdle(*device);
 	CleanupRenderer();
 	CreateRenderer();
 }
@@ -216,12 +335,9 @@ void skeleton::Renderer::CreateInstance()
 void skeleton::Renderer::CreateDevice()
 {
 	// Select a physical device
-	uint32_t queueCount = 3;
 	uint32_t queueIndices[3];
+	VkPhysicalDevice physicalDevice;
 	ChoosePhysicalDevice(physicalDevice, queueIndices[0], queueIndices[1], queueIndices[2]);
-	graphicsQueueIndex = queueIndices[0];
-	presentQueueIndex = queueIndices[1];
-	transferQueueIndex = queueIndices[2];
 
 	SKL_PRINT(
 		SKL_DEBUG,
@@ -230,36 +346,17 @@ void skeleton::Renderer::CreateDevice()
 		queueIndices[1],
 		queueIndices[2]);
 
-	// Create the logical device
-	VkPhysicalDeviceFeatures enabledFeatures = {};
+	device = new VulkanDevice(physicalDevice);
 
-	const float priority = 1.f;
-	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos(queueCount);
-	for (uint32_t i = 0; i < queueCount; i++)
-	{
-		queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfos[i].queueFamilyIndex = queueIndices[i];
-		queueCreateInfos[i].queueCount = 1;
-		queueCreateInfos[i].pQueuePriorities = &priority;
-	}
+	device->queueIndices.graphics = queueIndices[0];
+	device->queueIndices.present  = queueIndices[1];
+	device->queueIndices.transfer = queueIndices[2];
 
-	VkDeviceCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pEnabledFeatures = &enabledFeatures;
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-	createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayer.size());
-	createInfo.ppEnabledLayerNames = validationLayer.data();
-	createInfo.queueCreateInfoCount = queueCount;
-	createInfo.pQueueCreateInfos = queueCreateInfos.data();
+	device->CreateLogicalDevice(
+		{queueIndices[0], queueIndices[1], queueIndices[2]},
+		deviceExtensions,
+		validationLayer);
 
-	SKL_ASSERT_VK(
-		vkCreateDevice(physicalDevice, &createInfo, nullptr, &device),
-		"Failed to create logical device");
-
-	vkGetDeviceQueue(device, queueIndices[0], 0, &graphicsQueue);
-	vkGetDeviceQueue(device, queueIndices[1], 0, &presentQueue);
-	vkGetDeviceQueue(device, queueIndices[2], 0, &transferQueue);
 }
 
 // Determines the best physical device for rendering
@@ -345,13 +442,7 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 
 void skeleton::Renderer::CreateCommandPools()
 {
-	VkCommandPoolCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	createInfo.queueFamilyIndex = graphicsQueueIndex;
-
-	SKL_ASSERT_VK(
-		vkCreateCommandPool(device, &createInfo, nullptr, &graphicsPool),
-		"Failed to create graphics command pool");
+	device->CreateCommandPool(graphicsPool, device->queueIndices.graphics);
 }
 
 void skeleton::Renderer::CreateSyncObjects()
@@ -371,13 +462,13 @@ void skeleton::Renderer::CreateSyncObjects()
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
 		SKL_ASSERT_VK(
-			vkCreateFence(device, &fenceInfo, nullptr, &flightFences[i]),
+			vkCreateFence(*device, &fenceInfo, nullptr, &flightFences[i]),
 			"Failed to create sync fence");
 		SKL_ASSERT_VK(
-			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]),
+			vkCreateSemaphore(*device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]),
 			"Failed to create image semaphore");
 		SKL_ASSERT_VK(
-			vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderCompleteSemaphores[i]),
+			vkCreateSemaphore(*device, &semaphoreInfo, nullptr, &renderCompleteSemaphores[i]),
 			"Failed to create render semaphore");
 	}
 }
@@ -394,7 +485,7 @@ void skeleton::Renderer::CreateCommandBuffers()
 	allocInfo.commandPool = graphicsPool;
 
 	SKL_ASSERT_VK(
-		vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()),
+		vkAllocateCommandBuffers(*device, &allocInfo, commandBuffers.data()),
 		"Failed to allocate command buffers");
 }
 
@@ -405,15 +496,15 @@ void skeleton::Renderer::CreateCommandBuffers()
 void skeleton::Renderer::CreateSwapchain()
 {
 	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(physicalDevice, &props);
+	vkGetPhysicalDeviceProperties(device->physicalDevice, &props);
 	VkPhysicalDeviceFeatures features;
-	vkGetPhysicalDeviceFeatures(physicalDevice, &features);
+	vkGetPhysicalDeviceFeatures(device->physicalDevice, &features);
 
 	// Find the best format
 	uint32_t surfaceFormatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, nullptr);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, surface, &surfaceFormatCount, nullptr);
 	std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data());
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data());
 
 	VkSurfaceFormatKHR formatInfo = surfaceFormats[0];
 	for (const auto& p : surfaceFormats)
@@ -426,9 +517,9 @@ void skeleton::Renderer::CreateSwapchain()
 	}
 
 	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, surface, &presentModeCount, nullptr);
 	std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, surface, &presentModeCount, presentModes.data());
 
 	VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 	for (const auto& p : presentModes)
@@ -442,7 +533,7 @@ void skeleton::Renderer::CreateSwapchain()
 
 	// Get the device's extent
 	VkSurfaceCapabilitiesKHR capabilities;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physicalDevice, surface, &capabilities);
 	VkExtent2D extent;
 	if (capabilities.currentExtent.width != UINT32_MAX)
 	{
@@ -473,9 +564,9 @@ void skeleton::Renderer::CreateSwapchain()
 	createInfo.imageExtent = extent;
 	createInfo.minImageCount = imageCount;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	if (graphicsQueueIndex != presentQueueIndex)
+	if (device->queueIndices.graphics != device->queueIndices.present)
 	{
-		uint32_t sharedIndices[] = {graphicsQueueIndex, presentQueueIndex};
+		uint32_t sharedIndices[] = { device->queueIndices.graphics, device->queueIndices.present };
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 		createInfo.queueFamilyIndexCount = 2;
 		createInfo.pQueueFamilyIndices = sharedIndices;
@@ -489,15 +580,15 @@ void skeleton::Renderer::CreateSwapchain()
 	createInfo.presentMode = presentMode;
 
 	SKL_ASSERT_VK(
-		vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain),
+		vkCreateSwapchainKHR(*device, &createInfo, nullptr, &swapchain),
 		"Failed to create swapchain");
 
 	swapchainFormat = formatInfo.format;
 	swapchainExtent = extent;
 
-	vkGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
+	vkGetSwapchainImagesKHR(*device, swapchain, &imageCount, nullptr);
 	swapchainImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(device, swapchain, &imageCount, swapchainImages.data());
+	vkGetSwapchainImagesKHR(*device, swapchain, &imageCount, swapchainImages.data());
 
 	swapchainImageViews.resize(imageCount);
 	for (uint32_t i = 0; i < imageCount; i++)
@@ -536,7 +627,7 @@ void skeleton::Renderer::CreateRenderpass()
 	creteInfo.pSubpasses = &subpass;
 
 	SKL_ASSERT_VK(
-		vkCreateRenderPass(device, &creteInfo, nullptr, &renderpass),
+		vkCreateRenderPass(*device, &creteInfo, nullptr, &renderpass),
 		"Failed to create renderpass");
 }
 
@@ -545,19 +636,20 @@ void skeleton::Renderer::CreatePipelineLayout()
 	//Pipeline Layout/////////////////////////////////////////////////////////
 	VkPipelineLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	layoutInfo.setLayoutCount = 0;
-	layoutInfo.pSetLayouts = nullptr;
+	layoutInfo.setLayoutCount = 1;
+	layoutInfo.pSetLayouts = &descriptorSetLayout;
 	layoutInfo.pushConstantRangeCount = 0;
 	layoutInfo.pPushConstantRanges = nullptr;
 
 	SKL_ASSERT_VK(
-		vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout),
+		vkCreatePipelineLayout(*device, &layoutInfo, nullptr, &pipelineLayout),
 		"Failed to create pipeline layout");
 }
 
 void skeleton::Renderer::CreatePipeline()
 {
-	//Viewport State//////////////////////////////////////////////////////////
+	// Viewport State
+	//=================================================
 	VkViewport viewport;
 	viewport.x = 0;
 	viewport.y = 0;
@@ -577,25 +669,31 @@ void skeleton::Renderer::CreatePipeline()
 	viewportStateInfo.viewportCount = 1;
 	viewportStateInfo.pViewports = &viewport;
 
-	//Vert Input State////////////////////////////////////////////////////////
+	// Vert Input State
+	//=================================================
+	const auto vertexInputBindingDesc = skeleton::Vertex::GetBindingDescription();
+	const auto vertexInputAttribDescs = skeleton::Vertex::GetAttributeDescriptions();
+
 	VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {};
 	vertexInputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputStateInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputStateInfo.pVertexAttributeDescriptions = nullptr;
-	vertexInputStateInfo.vertexBindingDescriptionCount = 0;
-	vertexInputStateInfo.pVertexBindingDescriptions = nullptr;
+	vertexInputStateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttribDescs.size());
+	vertexInputStateInfo.pVertexAttributeDescriptions = vertexInputAttribDescs.data();
+	vertexInputStateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputStateInfo.pVertexBindingDescriptions = &vertexInputBindingDesc;
 
-	//Input Assembly//////////////////////////////////////////////////////////
+	// Input Assembly
+	//=================================================
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo = {};
 	inputAssemblyStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	inputAssemblyStateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssemblyStateInfo.primitiveRestartEnable = VK_FALSE;
 
-	//Rasterizer//////////////////////////////////////////////////////////////
+	// Rasterizer
+	//=================================================
 	VkPipelineRasterizationStateCreateInfo rasterStateInfo = {};
 	rasterStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterStateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterStateInfo.rasterizerDiscardEnable = VK_TRUE;
 	rasterStateInfo.lineWidth = 1.f;
@@ -603,16 +701,22 @@ void skeleton::Renderer::CreatePipeline()
 	rasterStateInfo.depthClampEnable = VK_FALSE;
 	rasterStateInfo.rasterizerDiscardEnable = VK_FALSE;
 
-	//Multisample State///////////////////////////////////////////////////////
+	// Multisample State
+	//=================================================
 	VkPipelineMultisampleStateCreateInfo multisampleStateInfo = {};
 	multisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 	multisampleStateInfo.sampleShadingEnable = VK_FALSE;
 
-	//Depth State/////////////////////////////////////////////////////////////
+	// Depth State
+	//=================================================
 	VkPipelineDepthStencilStateCreateInfo depthStateInfo = {};
+	depthStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depthStateInfo.depthTestEnable = VK_TRUE;
+	depthStateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 
-	//Color Blend State///////////////////////////////////////////////////////
+	// Color Blend State
+	//=================================================
 	VkPipelineColorBlendAttachmentState blendAttachmentState = {};
 	blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	blendAttachmentState.blendEnable = VK_FALSE;
@@ -623,13 +727,15 @@ void skeleton::Renderer::CreatePipeline()
 	blendStateInfo.attachmentCount = 1;
 	blendStateInfo.pAttachments = &blendAttachmentState;
 
-	//Dynamic states//////////////////////////////////////////////////////////
+	// Dynamic states
+	//=================================================
 	VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
 	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 	dynamicStateInfo.dynamicStateCount = 0;
 	dynamicStateInfo.pDynamicStates = nullptr;
 
-	//Shader modules//////////////////////////////////////////////////////////
+	// Shader modules
+	//=================================================
 	VkShaderModule vertModule = CreateShaderModule("res\\default_vert.spv");
 	VkShaderModule fragModule = CreateShaderModule("res\\default_frag.spv");
 
@@ -647,7 +753,8 @@ void skeleton::Renderer::CreatePipeline()
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
-	//Pipeline////////////////////////////////////////////////////////////////
+	// Pipeline
+	//=================================================
 	VkGraphicsPipelineCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	createInfo.pViewportState = &viewportStateInfo;
@@ -666,11 +773,11 @@ void skeleton::Renderer::CreatePipeline()
 	createInfo.renderPass = renderpass;
 
 	SKL_ASSERT_VK(
-		vkCreateGraphicsPipelines(device, nullptr, 1, &createInfo, nullptr, &pipeline),
+		vkCreateGraphicsPipelines(*device, nullptr, 1, &createInfo, nullptr, &pipeline),
 		"Failed to create graphics pipeline");
 
-	vkDestroyShaderModule(device, vertModule, nullptr);
-	vkDestroyShaderModule(device, fragModule, nullptr);
+	vkDestroyShaderModule(*device, vertModule, nullptr);
+	vkDestroyShaderModule(*device, fragModule, nullptr);
 }
 
 void skeleton::Renderer::CreateDepthImage()
@@ -688,7 +795,7 @@ void skeleton::Renderer::CreateFrameBuffers()
 	createInfo.width = swapchainExtent.width;
 	createInfo.height = swapchainExtent.height;
 
-	uint32_t imageCount = swapchainImageViews.size();
+	uint32_t imageCount = static_cast<uint32_t>(swapchainImageViews.size());
 	frameBuffers.resize(imageCount);
 
 	for (uint32_t i = 0; i < imageCount; i++)
@@ -696,7 +803,7 @@ void skeleton::Renderer::CreateFrameBuffers()
 		createInfo.pAttachments = &swapchainImageViews[i];
 
 		SKL_ASSERT_VK(
-			vkCreateFramebuffer(device, &createInfo, nullptr, &frameBuffers[i]),
+			vkCreateFramebuffer(*device, &createInfo, nullptr, &frameBuffers[i]),
 			"Failed to create a framebuffer");
 	}
 }
@@ -708,7 +815,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
 	VkClearValue clearValues[1] = {};
-	clearValues[0].color = {0.0f, 1.0f, 0.0f, 1.0f};
+	clearValues[0].color = {0.20784313725f, 0.21568627451f, 0.21568627451f, 1.0f};
 	//clearValues[1].depthStencil = {1, 0};
 
 	VkRenderPassBeginInfo rpBeginInfo = {};
@@ -729,7 +836,12 @@ void skeleton::Renderer::RecordCommandBuffers()
 
 		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		VkDeviceSize offset[] = {0};
+		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertBuffer, offset);
+		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
 
 		vkCmdEndRenderPass(commandBuffers[i]);
 
@@ -739,9 +851,9 @@ void skeleton::Renderer::RecordCommandBuffers()
 	}
 }
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // Helpers
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 // Returns the first instance of a queue with the input flags
 uint32_t skeleton::Renderer::GetQueueIndex(
@@ -804,25 +916,31 @@ uint32_t skeleton::Renderer::GetPresentIndex(
 	return bestfit;
 }
 
-//VkImage skeleton::Renderer::CreateImage()
-//{
-//	VkImageCreateInfo createInfo = {};
-//	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-//	createInfo.arrayLayers = 1;
-//	createInfo.extent = _extent;
-//	createInfo.format = _format;
-//	createInfo.imageType = VK_IMAGE_TYPE_2D;
-//	createInfo.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-//	createInfo.mipLevels = 1;
-//	createInfo.pQueueFamilyIndices = nullptr;
-//	createInfo.queueFamilyIndexCount = 1;
-//
-//	VkImage tmpImage;
-//	SKL_ASSERT_VK(
-//		vkCreateImage(device, &createInfo, nullptr, &tmpImage),
-//		"Failed to create image");
-//	return tmpImage;
-//}
+void skeleton::Renderer::CreateImage(
+	const VkExtent2D _extent,
+	const VkFormat _format,
+	const VkImageLayout _layout,
+	VkImage& _image,
+	VkImageView& _view)
+{
+	VkImageCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	createInfo.arrayLayers = 1;
+	createInfo.extent.width = _extent.width;
+	createInfo.extent.height = _extent.height;
+	createInfo.format = _format;
+	createInfo.imageType = VK_IMAGE_TYPE_2D;
+	createInfo.initialLayout = _layout;
+	createInfo.mipLevels = 1;
+	createInfo.pQueueFamilyIndices = nullptr;
+	createInfo.queueFamilyIndexCount = 1;
+
+	SKL_ASSERT_VK(
+		vkCreateImage(*device, &createInfo, nullptr, &_image),
+		"Failed to create image");
+
+	_view = CreateImageView(_format, _image);
+}
 
 VkImageView skeleton::Renderer::CreateImageView(
 	const VkFormat _format,
@@ -845,7 +963,7 @@ VkImageView skeleton::Renderer::CreateImageView(
 
 	VkImageView tmpView;
 	SKL_ASSERT_VK(
-		vkCreateImageView(device, &createInfo, nullptr, &tmpView),
+		vkCreateImageView(*device, &createInfo, nullptr, &tmpView),
 		"Failed to create image view");
 
 	return tmpView;
@@ -861,10 +979,37 @@ VkShaderModule skeleton::Renderer::CreateShaderModule(
 	moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderSource.data());
 	VkShaderModule tmpModule;
 	SKL_ASSERT_VK(
-		vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &tmpModule),
+		vkCreateShaderModule(*device, &moduleCreateInfo, nullptr, &tmpModule),
 		"Failed to create shader module");
 
 	return tmpModule;
 }
 
+void skeleton::Renderer::CreateModelBuffers()
+{
+	// Create vertex buffer
+	device->CreateAndFillBuffer(
+		vertBuffer,
+		vertMemory,
+		verts.data(),
+		sizeof(verts[0]) * verts.size(),
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+	// Create index buffer
+	device->CreateAndFillBuffer(
+		indexBuffer,
+		indexMemory,
+		indices.data(),
+		sizeof(indices[0]) * indices.size(),
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+	// Create uniform buffer
+	VkDeviceSize mvpSize = sizeof(MVPMatrices);
+	device->CreateBuffer(
+		mvpBuffer,
+		mvpMemory,
+		mvpSize,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+}
 

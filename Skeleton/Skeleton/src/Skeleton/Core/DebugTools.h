@@ -91,7 +91,7 @@ inline const char* VulkanResultToString(
 	if (vkAssertResult != VK_SUCCESS)						\
 	{														\
 		SKL_PRINT(SKL_ERROR_VK, errorMessage, __VA_ARGS__);	\
-		throw VulkanResultToString(vkAssertResult);			\
+		throw skeleton::VulkanResultToString(vkAssertResult);			\
 	}														\
 }
 

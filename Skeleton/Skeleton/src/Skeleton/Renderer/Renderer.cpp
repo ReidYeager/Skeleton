@@ -48,6 +48,7 @@ skeleton::Renderer::Renderer()
 
 	CreateInstance();
 	CreateDevice();
+	bufferManager = new BufferManager(device);
 	CreateCommandPools();
 
 	CreateDescriptorSetLayout();
@@ -78,7 +79,7 @@ skeleton::Renderer::Renderer()
 		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
 		mvp.proj[1][1] *= -1;
 
-		device->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
+		bufferManager->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
 
 		RenderFrame();
 
@@ -97,11 +98,6 @@ skeleton::Renderer::Renderer()
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
-	vkFreeMemory(*device, vertMemory, nullptr);
-	vkDestroyBuffer(*device, vertBuffer, nullptr);
-	vkFreeMemory(*device, indexMemory, nullptr);
-	vkDestroyBuffer(*device, indexBuffer, nullptr);
-
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
 		vkDestroyFence(*device, flightFences[i], nullptr);
@@ -109,8 +105,6 @@ skeleton::Renderer::~Renderer()
 		vkDestroySemaphore(*device, renderCompleteSemaphores[i], nullptr);
 	}
 
-	vkDestroyBuffer(*device, mvpBuffer, nullptr);
-	vkFreeMemory(*device, mvpMemory, nullptr);
 	vkDestroyDescriptorSetLayout(*device, descriptorSetLayout, nullptr);
 	vkDestroyDescriptorPool(*device, descriptorPool, nullptr);
 
@@ -118,6 +112,7 @@ skeleton::Renderer::~Renderer()
 
 	vkDestroyCommandPool(*device, graphicsPool, nullptr);
 
+	delete(bufferManager);
 	delete(device);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
@@ -988,7 +983,7 @@ VkShaderModule skeleton::Renderer::CreateShaderModule(
 void skeleton::Renderer::CreateModelBuffers()
 {
 	// Create vertex buffer
-	device->CreateAndFillBuffer(
+	bufferManager->CreateAndFillBuffer(
 		vertBuffer,
 		vertMemory,
 		verts.data(),
@@ -996,7 +991,7 @@ void skeleton::Renderer::CreateModelBuffers()
 		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	// Create index buffer
-	device->CreateAndFillBuffer(
+	bufferManager->CreateAndFillBuffer(
 		indexBuffer,
 		indexMemory,
 		indices.data(),
@@ -1005,7 +1000,7 @@ void skeleton::Renderer::CreateModelBuffers()
 
 	// Create uniform buffer
 	VkDeviceSize mvpSize = sizeof(MVPMatrices);
-	device->CreateBuffer(
+	bufferManager->CreateBuffer(
 		mvpBuffer,
 		mvpMemory,
 		mvpSize,

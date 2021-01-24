@@ -4,6 +4,12 @@
 
 #include "Skeleton/Core/Common.h"
 
+skeleton::VulkanDevice::VulkanDevice(
+	VkPhysicalDevice _physical) : physicalDevice(_physical)
+{
+
+}
+
 skeleton::VulkanDevice::~VulkanDevice()
 {
 	Cleanup();
@@ -52,148 +58,6 @@ void skeleton::VulkanDevice::Cleanup()
 {
 	vkDestroyCommandPool(logicalDevice, transientPool, nullptr);
 	vkDestroyDevice(logicalDevice, nullptr);
-}
-
-//=================================================
-// Buffers
-//=================================================
-
-void skeleton::VulkanDevice::CreateAndFillBuffer(
-	VkBuffer& _buffer,
-	VkDeviceMemory& _memory,
-	const void* _data,
-	VkDeviceSize _size,
-	VkBufferUsageFlags _usage)
-{
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingMemory;
-	CreateBuffer(
-		stagingBuffer,
-		stagingMemory,
-		_size,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	FillBuffer(stagingMemory, _data, _size);
-
-	CreateBuffer(
-		_buffer,
-		_memory,
-		_size,
-		_usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	CopyBuffer(stagingBuffer, _buffer, _size);
-
-	vkFreeMemory(logicalDevice, stagingMemory, nullptr);
-	vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
-}
-
-void skeleton::VulkanDevice::CreateBuffer(
-	VkBuffer& _buffer,
-	VkDeviceMemory& _memory,
-	VkDeviceSize _size,
-	VkBufferUsageFlags _usage,
-	VkMemoryPropertyFlags _memProperties)
-{
-	VkBufferCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	createInfo.usage = _usage;
-	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	createInfo.size = _size;
-
-	SKL_ASSERT_VK(
-		vkCreateBuffer(logicalDevice, &createInfo, nullptr, &_buffer),
-		"Failed to create vert buffer");
-
-	VkMemoryRequirements memReq;
-	vkGetBufferMemoryRequirements(logicalDevice, _buffer, &memReq);
-
-	VkMemoryAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	allocInfo.allocationSize = memReq.size;
-	allocInfo.memoryTypeIndex = FindMemoryType(
-		memReq.memoryTypeBits,
-		_memProperties);
-
-	SKL_ASSERT_VK(
-		vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &_memory),
-		"Failed to allocate vert memory");
-
-	vkBindBufferMemory(logicalDevice, _buffer, _memory, 0);
-}
-
-void skeleton::VulkanDevice::FillBuffer(
-	VkDeviceMemory& _memory,
-	const void* _data,
-	VkDeviceSize _size)
-{
-	void* tmpData;
-	vkMapMemory(logicalDevice, _memory, 0, _size, 0, &tmpData);
-	memcpy(tmpData, _data, static_cast<size_t>(_size));
-	vkUnmapMemory(logicalDevice, _memory);
-}
-
-void skeleton::VulkanDevice::CopyBuffer(
-	VkBuffer _src,
-	VkBuffer _dst,
-	VkDeviceSize _size)
-{
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = transientPool;
-	allocInfo.commandBufferCount = 1;
-
-	VkCommandBuffer transferCommand;
-	SKL_ASSERT_VK(
-		vkAllocateCommandBuffers(logicalDevice, &allocInfo, &transferCommand),
-		"Failed to create transient command buffer");
-
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	vkBeginCommandBuffer(transferCommand, &beginInfo);
-
-	VkBufferCopy region = {};
-	region.size = _size;
-	region.dstOffset = 0;
-	region.srcOffset = 0;
-
-	vkCmdCopyBuffer(transferCommand, _src, _dst, 1, &region);
-
-	vkEndCommandBuffer(transferCommand);
-
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &transferCommand;
-
-	vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(transferQueue);
-
-	vkFreeCommandBuffers(logicalDevice, transientPool, 1, &transferCommand);
-}
-
-uint32_t skeleton::VulkanDevice::FindMemoryType(
-	uint32_t _mask,
-	VkMemoryPropertyFlags _flags)
-{
-	VkPhysicalDeviceMemoryProperties props;
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &props);
-
-	for (uint32_t i = 0; i < props.memoryTypeCount; i++)
-	{
-		if (_mask & (1 << i) && (props.memoryTypes[i].propertyFlags & _flags) == _flags)
-		{
-			return i;
-		}
-	}
-
-	SKL_ASSERT_VK(
-		VK_ERROR_UNKNOWN,
-		"Failed to find a suitable memory type");
-	return 0;
 }
 
 //=================================================

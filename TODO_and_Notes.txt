@@ -1,2 +1,4 @@
+\Skeleton\Skeleton\src\Skeleton\Renderer\BufferManager.h
+	 TODO :--: Line    16 :--: // TODO : Upgrade this to allow more buffers
 \Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.h
-	 TODO :--: Line    16 :--: // TODO : Move all SDL stuff to its own file
+	 TODO :--: Line    21 :--: // TODO : Move all SDL stuff to its own file

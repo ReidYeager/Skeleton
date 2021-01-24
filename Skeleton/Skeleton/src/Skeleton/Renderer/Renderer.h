@@ -9,6 +9,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "VulkanDevice.h"
+#include "BufferManager.h"
 
 namespace skeleton
 {
@@ -27,6 +28,7 @@ private:
 	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
 	std::vector<const char*> deviceExtensions   = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 	VulkanDevice* device;
+	BufferManager* bufferManager;
 
 	VkCommandPool graphicsPool;
 

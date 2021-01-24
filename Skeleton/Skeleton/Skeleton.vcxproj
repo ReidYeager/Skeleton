@@ -194,6 +194,7 @@
     <ClInclude Include="src\Skeleton\Core\Common.h" />
     <ClInclude Include="src\Skeleton\Core\DebugTools.h" />
     <ClInclude Include="src\Skeleton\Core\Vertex.h" />
+    <ClInclude Include="src\Skeleton\Renderer\BufferManager.h" />
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
     <ClInclude Include="src\Skeleton.h" />
     <ClInclude Include="src\Skeleton\Renderer\VulkanDevice.h" />
@@ -206,6 +207,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\Skeleton\Core\Application.cpp" />
+    <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\VulkanDevice.cpp" />
   </ItemGroup>

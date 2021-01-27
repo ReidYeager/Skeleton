@@ -16,6 +16,7 @@ class BufferManager
 private:
 	// TODO : Upgrade this to allow more buffers
 	uint64_t m_indexBitMap = 0;
+	#define INDEXBITMAPSIZE 64
 	std::vector<VkBuffer> m_buffers;
 	std::vector<VkDeviceMemory> m_memories;
 
@@ -48,6 +49,11 @@ public:
 	uint32_t CreateBuffer(
 		VkBuffer& _buffer,
 		VkDeviceMemory& _memory,
+		VkDeviceSize _size,
+		VkBufferUsageFlags _usage,
+		VkMemoryPropertyFlags _memProperties);
+
+	uint32_t CreateBuffer(
 		VkDeviceSize _size,
 		VkBufferUsageFlags _usage,
 		VkMemoryPropertyFlags _memProperties);

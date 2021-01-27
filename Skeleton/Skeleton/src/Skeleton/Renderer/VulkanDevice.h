@@ -45,44 +45,20 @@ public:
 		const std::vector<const char*> _deviceLayers);
 	void Cleanup();
 
-	// Buffers
-	//=================================================
-
-	//void CreateAndFillBuffer(
-	//	VkBuffer& _buffer,
-	//	VkDeviceMemory& _memory,
-	//	const void* _data,
-	//	VkDeviceSize size,
-	//	VkBufferUsageFlags _usage);
-
-	//void CreateBuffer(
-	//	VkBuffer& _buffer,
-	//	VkDeviceMemory& _memory,
-	//	VkDeviceSize _size,
-	//	VkBufferUsageFlags _usage,
-	//	VkMemoryPropertyFlags _memProperties);
-
-	//void FillBuffer(
-	//	VkDeviceMemory& memory,
-	//	const void* _data,
-	//	VkDeviceSize _size);
-
-	//void CopyBuffer(
-	//	VkBuffer _src,
-	//	VkBuffer _dst,
-	//	VkDeviceSize _size);
-
-	//uint32_t FindMemoryType(
-	//	uint32_t _mask,
-	//	VkMemoryPropertyFlags _flags);
-
-	// Pools
+	// Commands
 	//=================================================
 
 	void CreateCommandPool(
 		VkCommandPool& _pool,
 		uint32_t _queueIndex,
 		VkCommandPoolCreateFlags _flags = 0);
+
+	VkCommandBuffer BeginSingleTimeCommand(	
+		VkCommandPool& _pool);
+	void EndSingleTimeCommand(
+		VkCommandBuffer _command,
+		VkCommandPool& _pool,
+		VkQueue& _queue);
 
 	// Operators
 	//=================================================

@@ -3,6 +3,9 @@
 #include <fstream>
 #include <vector>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
+
 #include "Common.h"
 
 namespace skeleton::tools
@@ -28,6 +31,17 @@ inline std::vector<char> LoadFileAsString(
 	inFile.close();
 	return finalString;
 }
+
+//inline void LoadImage(
+//	const char* _directory)
+//{
+//	int width, height, channels;
+//	stbi_uc* img = stbi_load(_directory, &width, &height, &channels, STBI_rgb_alpha);
+//	VkDeviceSize size = width * height * 4;
+//
+//	SKL_PRINT_SLIM("%p", img);
+//	assert(img == nullptr);
+//}
 
 } // namespace skeleton
 

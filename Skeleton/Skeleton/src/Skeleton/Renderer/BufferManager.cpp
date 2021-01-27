@@ -19,7 +19,7 @@ skeleton::BufferManager::~BufferManager()
 bool skeleton::BufferManager::GetIndexBitMapAt(
 	uint32_t _index)
 {
-	return (m_indexBitMap & (1 << _index));
+	return (m_indexBitMap & (1i64 << _index));
 }
 
 void skeleton::BufferManager::SetIndexBitMapAt(
@@ -28,11 +28,11 @@ void skeleton::BufferManager::SetIndexBitMapAt(
 {
 	if (_value)
 	{
-		m_indexBitMap |= (1 << _index);
+		m_indexBitMap |= (1i64 << _index);
 	}
 	else
 	{
-		m_indexBitMap &= ~(1 << _index);
+		m_indexBitMap &= ~(1i64 << _index);
 	}
 }
 
@@ -74,7 +74,7 @@ uint32_t skeleton::BufferManager::GetFirstAvailableIndex()
 {
 	uint32_t arraySize = static_cast<uint32_t>(m_buffers.size());
 	uint32_t i = 0;
-	while (i <= arraySize && i < 64)
+	while (i <= arraySize && i < INDEXBITMAPSIZE)
 	{
 		if (GetIndexBitMapAt(i) == 0)
 		{
@@ -179,6 +179,63 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 	return index;
 }
 
+uint32_t skeleton::BufferManager::CreateBuffer(
+	VkDeviceSize _size,
+	VkBufferUsageFlags _usage,
+	VkMemoryPropertyFlags _memProperties)
+{
+	uint32_t index = GetFirstAvailableIndex();
+	SetIndexBitMapAt(index);
+
+	VkBufferCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.usage = _usage;
+	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	createInfo.size = _size;
+
+	VkBuffer tmpBuffer;
+	SKL_ASSERT_VK(
+		vkCreateBuffer(*m_device, &createInfo, nullptr, &tmpBuffer),
+		"Failed to create vert buffer");
+
+	if (index < static_cast<uint32_t>(m_buffers.size()))
+	{
+		m_buffers[index] = tmpBuffer;
+	}
+	else
+	{
+		m_buffers.push_back(tmpBuffer);
+	}
+
+	VkMemoryRequirements memReq;
+	vkGetBufferMemoryRequirements(*m_device, m_buffers[index], &memReq);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memReq.size;
+	allocInfo.memoryTypeIndex = FindMemoryType(
+		memReq.memoryTypeBits,
+		_memProperties);
+
+	VkDeviceMemory tmpMemory;
+	SKL_ASSERT_VK(
+		vkAllocateMemory(*m_device, &allocInfo, nullptr, &tmpMemory),
+		"Failed to allocate vert memory");
+
+	if (index < static_cast<uint32_t>(m_memories.size()))
+	{
+		m_memories[index] = tmpMemory;
+	}
+	else
+	{
+		m_memories.push_back(tmpMemory);
+	}
+
+	vkBindBufferMemory(*m_device, m_buffers[index], m_memories[index], 0);
+
+	return index;
+}
+
 void skeleton::BufferManager::FillBuffer(
 	VkDeviceMemory& _memory,
 	const void* _data,
@@ -195,40 +252,16 @@ void skeleton::BufferManager::CopyBuffer(
 	VkBuffer _dst,
 	VkDeviceSize _size)
 {
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool = m_device->transientPool;
-	allocInfo.commandBufferCount = 1;
-
-	VkCommandBuffer transferCommand;
-	SKL_ASSERT_VK(
-		vkAllocateCommandBuffers(*m_device, &allocInfo, &transferCommand),
-		"Failed to create transient command buffer");
-
-	VkCommandBufferBeginInfo beginInfo = {};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	vkBeginCommandBuffer(transferCommand, &beginInfo);
+	VkCommandBuffer copyCommand = m_device->BeginSingleTimeCommand(m_device->transientPool);
 
 	VkBufferCopy region = {};
 	region.size = _size;
 	region.dstOffset = 0;
 	region.srcOffset = 0;
 
-	vkCmdCopyBuffer(transferCommand, _src, _dst, 1, &region);
+	vkCmdCopyBuffer(copyCommand, _src, _dst, 1, &region);
 
-	vkEndCommandBuffer(transferCommand);
-
-	VkSubmitInfo submitInfo = {};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &transferCommand;
-
-	vkQueueSubmit(m_device->transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	vkQueueWaitIdle(m_device->transferQueue);
-
-	vkFreeCommandBuffers(*m_device, m_device->transientPool, 1, &transferCommand);
+	m_device->EndSingleTimeCommand(copyCommand, m_device->transientPool, m_device->transferQueue);
 }
 
 uint32_t skeleton::BufferManager::FindMemoryType(

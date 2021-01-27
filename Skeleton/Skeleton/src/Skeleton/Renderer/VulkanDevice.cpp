@@ -61,7 +61,7 @@ void skeleton::VulkanDevice::Cleanup()
 }
 
 //=================================================
-// Pools
+// Commands
 //=================================================
 
 void skeleton::VulkanDevice::CreateCommandPool(
@@ -76,5 +76,45 @@ void skeleton::VulkanDevice::CreateCommandPool(
 	SKL_ASSERT_VK(
 		vkCreateCommandPool(logicalDevice, &createInfo, nullptr, &_pool),
 		"Failed to create command pool with flags %u", _flags);
+}
+
+VkCommandBuffer skeleton::VulkanDevice::BeginSingleTimeCommand(
+	VkCommandPool& _pool)
+{
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = _pool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer singleCommand;
+	SKL_ASSERT_VK(
+		vkAllocateCommandBuffers(logicalDevice, &allocInfo, &singleCommand),
+		"Failed to create transient command buffer");
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	vkBeginCommandBuffer(singleCommand, &beginInfo);
+
+	return singleCommand;
+}
+
+void skeleton::VulkanDevice::EndSingleTimeCommand(
+	VkCommandBuffer _command,
+	VkCommandPool& _pool,
+	VkQueue& _queue)
+{
+	vkEndCommandBuffer(_command);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &_command;
+
+	vkQueueSubmit(_queue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(_queue);
+
+	vkFreeCommandBuffers(logicalDevice, _pool, 1, &_command);
 }
 

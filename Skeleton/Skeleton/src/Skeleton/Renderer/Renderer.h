@@ -38,6 +38,10 @@ private:
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
 
+	VkImage textureImage;
+	VkDeviceMemory textureMemory;
+	VkImageView textureImageView;
+
 	VkImage depthImage;
 	VkImageView depthImageView;
 
@@ -149,13 +153,6 @@ protected:
 		uint32_t _queuePropertyCount,
 		uint32_t _graphicsIndex);
 
-	void CreateImage(
-		const VkExtent2D _extent,
-		const VkFormat _format,
-		const VkImageLayout _layout,
-		VkImage& _image,
-		VkImageView& _view);
-
 	VkImageView CreateImageView(
 		const VkFormat _format,
 		const VkImage& _image);
@@ -164,6 +161,31 @@ protected:
 		const char* _directory);
 
 	void CreateModelBuffers();
+
+	void CreateImage(
+		uint32_t _width,
+		uint32_t _height,
+		VkFormat _format,
+		VkImageTiling _tiling,
+		VkImageUsageFlags _usage,
+		VkMemoryPropertyFlags _memFlags,
+		VkImage& _image,
+		VkDeviceMemory& _memory);
+
+	void CreateTextureImage(
+		const char* _directory);
+
+	void TransitionImageLayout(
+		VkImage _iamge,
+		VkFormat _format,
+		VkImageLayout _old,
+		VkImageLayout _new);
+
+	void CopyBufferToImage(
+		VkBuffer _buffer,
+		VkImage _image,
+		uint32_t _width,
+		uint32_t _height);
 
 }; // Renderer
 } // namespace skeleton

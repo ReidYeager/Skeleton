@@ -4,10 +4,11 @@
 #include <string>
 #include <chrono>
 
+#include "stb/stb_image.h"
+
 #include "Renderer.h"
 #include "Skeleton/Core/Common.h"
 #include "Skeleton/Core/AssetLoader.h"
-
 #include "Skeleton/Core/Vertex.h"
 
 const std::vector<skeleton::Vertex> verts = {
@@ -55,6 +56,7 @@ skeleton::Renderer::Renderer()
 
 	CreateRenderer();
 
+	CreateTextureImage("res/TestImage.jpg");
 	CreateModelBuffers();
 	CreateDescriptorPool();
 	CreateDescriptorSet();
@@ -62,7 +64,7 @@ skeleton::Renderer::Renderer()
 	CreateCommandBuffers();
 	RecordCommandBuffers();
 
-	SKL_PRINT(End Init, "-------------------------------------------------");
+	SKL_PRINT("End Init", "-------------------------------------------------");
 
 	bool stayOpen = true;
 	SDL_Event e;
@@ -98,6 +100,9 @@ skeleton::Renderer::Renderer()
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
+	vkFreeMemory(*device, textureMemory, nullptr);
+	vkDestroyImage(*device, textureImage, nullptr);
+
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
 		vkDestroyFence(*device, flightFences[i], nullptr);
@@ -911,32 +916,6 @@ uint32_t skeleton::Renderer::GetPresentIndex(
 	return bestfit;
 }
 
-void skeleton::Renderer::CreateImage(
-	const VkExtent2D _extent,
-	const VkFormat _format,
-	const VkImageLayout _layout,
-	VkImage& _image,
-	VkImageView& _view)
-{
-	VkImageCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	createInfo.arrayLayers = 1;
-	createInfo.extent.width = _extent.width;
-	createInfo.extent.height = _extent.height;
-	createInfo.format = _format;
-	createInfo.imageType = VK_IMAGE_TYPE_2D;
-	createInfo.initialLayout = _layout;
-	createInfo.mipLevels = 1;
-	createInfo.pQueueFamilyIndices = nullptr;
-	createInfo.queueFamilyIndexCount = 1;
-
-	SKL_ASSERT_VK(
-		vkCreateImage(*device, &createInfo, nullptr, &_image),
-		"Failed to create image");
-
-	_view = CreateImageView(_format, _image);
-}
-
 VkImageView skeleton::Renderer::CreateImageView(
 	const VkFormat _format,
 	const VkImage& _image)
@@ -1006,5 +985,195 @@ void skeleton::Renderer::CreateModelBuffers()
 		mvpSize,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+}
+
+void skeleton::Renderer::CreateImage(
+	uint32_t _width,
+	uint32_t _height,
+	VkFormat _format,
+	VkImageTiling _tiling,
+	VkImageUsageFlags _usage,
+	VkMemoryPropertyFlags _memFlags,
+	VkImage& _image,
+	VkDeviceMemory& _memory)
+{
+	VkImageCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	createInfo.imageType = VK_IMAGE_TYPE_2D;
+	createInfo.extent.width = _width;
+	createInfo.extent.height = _height;
+	createInfo.extent.depth = 1;
+	createInfo.mipLevels = 1;
+	createInfo.arrayLayers = 1;
+	createInfo.format = _format;
+	createInfo.tiling = _tiling;
+	createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	createInfo.usage = _usage;
+	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	createInfo.flags = 0;
+
+	SKL_ASSERT_VK(
+		vkCreateImage(*device, &createInfo, nullptr, &_image),
+		"Failed to create texture image");
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(*device, _image, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = bufferManager->FindMemoryType(
+		memRequirements.memoryTypeBits,
+		_memFlags);
+
+	SKL_ASSERT_VK(
+		vkAllocateMemory(*device, &allocInfo, nullptr, &_memory),
+		"Failed to allocate texture memory");
+
+	vkBindImageMemory(*device, _image, _memory, 0);
+}
+
+void skeleton::Renderer::CreateTextureImage(
+	const char* _directory)
+{
+	// Image loading
+	//=================================================
+	int width, height, channels;
+	stbi_uc* img = stbi_load(_directory, &width, &height, &channels, STBI_rgb_alpha);
+	VkDeviceSize size = width * height * 4;
+
+	assert(img != nullptr);
+
+	// Staging buffer
+	//=================================================
+
+	VkDeviceMemory stagingMemory;
+	VkBuffer stagingBuffer;
+
+	uint32_t stagingIndex =	bufferManager->CreateBuffer(
+		stagingBuffer,
+		stagingMemory,
+		size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	bufferManager->FillBuffer(stagingMemory, img, size);
+
+	stbi_image_free(img);
+
+	// Image creation
+	//=================================================
+
+	CreateImage(
+		static_cast<uint32_t>(width),
+		static_cast<uint32_t>(height),
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		textureImage,
+		textureMemory);
+
+	TransitionImageLayout(
+		textureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	CopyBufferToImage(
+		stagingBuffer,
+		textureImage,
+		static_cast<uint32_t>(width),
+		static_cast<uint32_t>(height));
+	TransitionImageLayout(
+		textureImage,
+		VK_FORMAT_R8G8B8A8_UNORM,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+	bufferManager->RemoveAtIndex(stagingIndex);
+}
+
+void skeleton::Renderer::TransitionImageLayout(
+	VkImage _iamge,
+	VkFormat _format,
+	VkImageLayout _old,
+	VkImageLayout _new)
+{
+	VkCommandBuffer transitionCommand = device->BeginSingleTimeCommand(graphicsPool);
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = _old;
+	barrier.newLayout = _new;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = _iamge;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.layerCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+
+	VkPipelineStageFlagBits srcStage;
+	VkPipelineStageFlagBits dstStage;
+
+
+	if (_old == VK_IMAGE_LAYOUT_UNDEFINED && _new == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (_old == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && _new == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else
+	{
+		SKL_LOG(SKL_ERROR, "Not a handled image transition");
+	}
+
+	vkCmdPipelineBarrier(transitionCommand, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+	device->EndSingleTimeCommand(transitionCommand, graphicsPool, device->graphicsQueue);
+}
+
+void skeleton::Renderer::CopyBufferToImage(
+	VkBuffer _buffer,
+	VkImage _image,
+	uint32_t _width,
+	uint32_t _height)
+{
+	VkCommandBuffer command = device->BeginSingleTimeCommand(device->transientPool);
+
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageSubresource.baseArrayLayer = 0;
+
+	region.imageOffset = {0, 0, 0};
+	region.imageExtent = {_width, _height, 1};
+
+	vkCmdCopyBufferToImage(
+		command,
+		_buffer,
+		_image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		&region);
+
+	device->EndSingleTimeCommand(command, device->transientPool, device->transferQueue);
 }
 

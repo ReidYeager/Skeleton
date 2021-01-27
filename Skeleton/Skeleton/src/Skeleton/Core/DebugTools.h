@@ -7,12 +7,9 @@
 namespace skeleton
 {
 
-enum SKLDebugPrintCategories
-{
-	SKL_DEBUG,
-	SKL_ERROR,
-	SKL_ERROR_VK
-};
+#define SKL_DEBUG "SKL_DEBUG"
+#define SKL_ERROR "SKL_ERROR"
+#define SKL_ERROR_VK "SKL_ERROR_VK"
 
 inline const char* VulkanResultToString(
 	VkResult _result)
@@ -68,7 +65,7 @@ inline const char* VulkanResultToString(
 
 #define SKL_PRINT(category, message, ...)	\
 {											\
-	printf("%s :--: ", #category);			\
+	printf("%s :--: ", category);			\
 	printf(message, __VA_ARGS__);			\
 	printf("\n");							\
 }

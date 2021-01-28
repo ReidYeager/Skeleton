@@ -21,6 +21,7 @@ void skeleton::VulkanDevice::CreateLogicalDevice(
 	const std::vector<const char*> _deviceLayers)
 {
 	VkPhysicalDeviceFeatures enabledFeatures = {};
+	enabledFeatures.samplerAnisotropy = VK_TRUE;
 	uint32_t queueCount = static_cast<uint32_t>(_queueIndices.size());
 
 	const float priority = 1.f;

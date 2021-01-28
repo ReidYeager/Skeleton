@@ -12,20 +12,24 @@
 #include "Skeleton/Core/Vertex.h"
 
 const std::vector<skeleton::Vertex> verts = {
-	{{-0.25f, -0.5f, 1.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}},
-	{{ 0.25f,  0.5f, 1.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}},
-	{{-0.75f,  0.5f, 1.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}},
-	{{ 0.75f, -0.5f, 1.0f}, {1.f, 1.f, 1.f}},
+	//{{-0.25f, -0.5f, 1.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 0.0f}},
+	//{{ 0.25f,  0.5f, 1.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 0.0f}},
+	//{{-0.75f,  0.5f, 1.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 1.0f}},
+	//{{ 0.75f, -0.5f, 1.0f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}},
+	{{-0.5f, -0.5f, -2.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 1.0f}},
+	{{ 0.5f, -0.5f, -2.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 1.0f}},
+	{{ 0.5f,  0.5f, -2.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 0.0f}},
+	{{-0.5f,  0.5f, -2.0f}, {1.f, 1.f, 1.f}, {0.0f, 0.0f}},
 
-	{{ 0.25f, -0.5f, 0.5f}, {1.f, 0.f, 0.f}},
-	{{-0.25f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}},
-	{{ 0.75f,  0.5f, 0.5f}, {0.f, 0.f, 1.f}},
-	{{-0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}}
+	{{ 0.25f, -0.5f, 0.5f}, {1.f, 0.f, 0.f}, {0.0f, 0.0f}},
+	{{-0.25f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}, {1.0f, 0.0f}},
+	{{ 0.75f,  0.5f, 0.5f}, {0.f, 0.f, 1.f}, {1.0f, 1.0f}},
+	{{-0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}}
 };
 
 const std::vector<uint32_t> indices = {
 	0, 1, 2,
-	0, 3, 1,
+	2, 3, 0,
 
 	4, 6, 5,
 	4, 5, 7
@@ -56,7 +60,7 @@ skeleton::Renderer::Renderer()
 
 	CreateRenderer();
 
-	CreateTextureImage("res/TestImage.jpg");
+	CreateTextureImage("res/TestImage.png");
 	CreateModelBuffers();
 	CreateDescriptorPool();
 	CreateDescriptorSet();
@@ -76,8 +80,10 @@ skeleton::Renderer::Renderer()
 		auto curTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
 
-		mvp.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
-		mvp.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
+		mvp.model = glm::mat4(1.0f);
+		//mvp.model = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.f, 0.f, 1.f));
+		//mvp.view = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+		mvp.view = glm::mat4(1.0f);
 		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
 		mvp.proj[1][1] *= -1;
 
@@ -101,6 +107,8 @@ skeleton::Renderer::Renderer()
 skeleton::Renderer::~Renderer()
 {
 	vkFreeMemory(*device, textureMemory, nullptr);
+	vkDestroySampler(*device, textureSampler, nullptr);
+	vkDestroyImageView(*device, textureImageView, nullptr);
 	vkDestroyImage(*device, textureImage, nullptr);
 
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
@@ -175,17 +183,24 @@ void skeleton::Renderer::RenderFrame()
 
 void skeleton::Renderer::CreateDescriptorSetLayout()
 {
-	VkDescriptorSetLayoutBinding mvpBinding = {};
-	mvpBinding.binding = 0;
-	mvpBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	mvpBinding.descriptorCount = 1;
-	mvpBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	mvpBinding.pImmutableSamplers = nullptr;
+	VkDescriptorSetLayoutBinding mvpBufferBinding = {};
+	mvpBufferBinding.binding = 0;
+	mvpBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	mvpBufferBinding.descriptorCount = 1;
+	mvpBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	mvpBufferBinding.pImmutableSamplers = nullptr;
+	VkDescriptorSetLayoutBinding textureBinding = {};
+	textureBinding.binding = 1;
+	textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	textureBinding.descriptorCount = 1;
+	textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	textureBinding.pImmutableSamplers = nullptr;
 
+	VkDescriptorSetLayoutBinding bindings[] = {mvpBufferBinding, textureBinding};
 	VkDescriptorSetLayoutCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	createInfo.bindingCount = 1;
-	createInfo.pBindings = &mvpBinding;
+	createInfo.bindingCount = 2;
+	createInfo.pBindings = bindings;
 
 	SKL_ASSERT_VK(
 		vkCreateDescriptorSetLayout(*device, &createInfo, nullptr, &descriptorSetLayout),
@@ -194,14 +209,16 @@ void skeleton::Renderer::CreateDescriptorSetLayout()
 
 void skeleton::Renderer::CreateDescriptorPool()
 {
-	VkDescriptorPoolSize poolSize = {};
-	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSize.descriptorCount = 1;
+	VkDescriptorPoolSize poolSizes[2] = {};
+	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSizes[0].descriptorCount = 1;
+	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSizes[1].descriptorCount = 1;
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	createInfo.poolSizeCount = 1;
-	createInfo.pPoolSizes = &poolSize;
+	createInfo.poolSizeCount = 2;
+	createInfo.pPoolSizes = poolSizes;
 	createInfo.maxSets = 1;
 
 	SKL_ASSERT_VK(
@@ -221,24 +238,40 @@ void skeleton::Renderer::CreateDescriptorSet()
 		vkAllocateDescriptorSets(*device, &allocInfo, &descriptorSet),
 		"Failed to allocate descriptor set");
 
-	// 
+	// mvp buffer
 	VkDescriptorBufferInfo bufferInfo = {};
 	bufferInfo.buffer = mvpBuffer;
 	bufferInfo.offset = 0;
 	bufferInfo.range = VK_WHOLE_SIZE;
 
-	VkWriteDescriptorSet descWrite = {};
-	descWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descWrite.dstSet = descriptorSet;
-	descWrite.dstBinding = 0;
-	descWrite.dstArrayElement = 0;
-	descWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descWrite.descriptorCount = 1;
-	descWrite.pBufferInfo = &bufferInfo;
-	descWrite.pImageInfo = nullptr;
-	descWrite.pTexelBufferView = nullptr;
+	// Texture sampler
+	VkDescriptorImageInfo imageInfo = {};
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	imageInfo.sampler = textureSampler;
+	imageInfo.imageView = textureImageView;
 
-	vkUpdateDescriptorSets(*device, 1, &descWrite, 0, nullptr);
+	VkWriteDescriptorSet descWrites[2] = {};
+	descWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descWrites[0].dstSet = descriptorSet;
+	descWrites[0].dstBinding = 0;
+	descWrites[0].dstArrayElement = 0;
+	descWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descWrites[0].descriptorCount = 1;
+	descWrites[0].pBufferInfo = &bufferInfo;
+	descWrites[0].pImageInfo = nullptr;
+	descWrites[0].pTexelBufferView = nullptr;
+
+	descWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descWrites[1].dstSet = descriptorSet;
+	descWrites[1].dstBinding = 1;
+	descWrites[1].dstArrayElement = 0;
+	descWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descWrites[1].descriptorCount = 1;
+	descWrites[1].pBufferInfo = nullptr;
+	descWrites[1].pImageInfo = &imageInfo;
+	descWrites[1].pTexelBufferView = nullptr;
+
+	vkUpdateDescriptorSets(*device, 2, descWrites, 0, nullptr);
 
 }
 
@@ -398,6 +431,9 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 
 		std::set<std::string> requiredExtensionSet(deviceExtensions.begin(), deviceExtensions.end());
 
+		VkPhysicalDeviceFeatures features;
+		vkGetPhysicalDeviceFeatures(pdevice, &features);
+
 		for (const auto& ext : physicalDeviceExt)
 		{
 			requiredExtensionSet.erase(ext.extensionName);
@@ -408,6 +444,7 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 		_presentIndex = GetPresentIndex(&pdevice, propertyCount, _graphicsIndex);
 
 		if (
+			features.samplerAnisotropy &&
 			requiredExtensionSet.empty() &&
 			_graphicsIndex != -1 &&
 			_presentIndex != -1 &&
@@ -1092,6 +1129,41 @@ void skeleton::Renderer::CreateTextureImage(
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	bufferManager->RemoveAtIndex(stagingIndex);
+
+	textureImageView = CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, textureImage);
+
+	CreateSampler();
+}
+
+void skeleton::Renderer::CreateSampler()
+{
+	VkSamplerCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	createInfo.magFilter = VK_FILTER_LINEAR;
+	createInfo.minFilter = VK_FILTER_LINEAR;
+	createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	VkPhysicalDeviceProperties physicalProps = {};
+	vkGetPhysicalDeviceProperties(device->physicalDevice, &physicalProps);
+	createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	createInfo.unnormalizedCoordinates = VK_FALSE;
+	createInfo.compareEnable = VK_FALSE;
+	createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	createInfo.mipLodBias = 0.0f;
+	createInfo.minLod = 0.0f;
+	createInfo.maxLod = 0.0f;
+
+	// TODO : Make this conditional based on the physicalDevice's capabilities
+	// (Includes physical device selection)
+	createInfo.anisotropyEnable = VK_TRUE;
+	createInfo.maxAnisotropy = physicalProps.limits.maxSamplerAnisotropy;
+
+	SKL_ASSERT_VK(
+		vkCreateSampler(*device, &createInfo, nullptr, &textureSampler),
+		"Failed to create texture sampler");
 }
 
 void skeleton::Renderer::TransitionImageLayout(

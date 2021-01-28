@@ -41,6 +41,7 @@ private:
 	VkImage textureImage;
 	VkDeviceMemory textureMemory;
 	VkImageView textureImageView;
+	VkSampler textureSampler;
 
 	VkImage depthImage;
 	VkImageView depthImageView;
@@ -174,6 +175,8 @@ protected:
 
 	void CreateTextureImage(
 		const char* _directory);
+
+	void CreateSampler();
 
 	void TransitionImageLayout(
 		VkImage _iamge,

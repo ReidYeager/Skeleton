@@ -44,6 +44,7 @@ private:
 	VkSampler textureSampler;
 
 	VkImage depthImage;
+	VkDeviceMemory depthMemory;
 	VkImageView depthImageView;
 
 	struct MVPMatrices {
@@ -156,6 +157,7 @@ protected:
 
 	VkImageView CreateImageView(
 		const VkFormat _format,
+		VkImageAspectFlags _aspect,
 		const VkImage& _image);
 
 	VkShaderModule CreateShaderModule(
@@ -189,6 +191,13 @@ protected:
 		VkImage _image,
 		uint32_t _width,
 		uint32_t _height);
+
+	VkFormat FindDepthFormat();
+
+	VkFormat FindSupportedFormat(
+		const std::vector<VkFormat>& _candidates,
+		VkImageTiling _tiling,
+		VkFormatFeatureFlags _features);
 
 }; // Renderer
 } // namespace skeleton

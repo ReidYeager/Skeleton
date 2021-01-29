@@ -12,27 +12,27 @@
 #include "Skeleton/Core/Vertex.h"
 
 const std::vector<skeleton::Vertex> verts = {
-	//{{-0.25f, -0.5f, 1.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 0.0f}},
-	//{{ 0.25f,  0.5f, 1.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 0.0f}},
-	//{{-0.75f,  0.5f, 1.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 1.0f}},
-	//{{ 0.75f, -0.5f, 1.0f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}},
-	{{-0.5f, -0.5f, -2.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 1.0f}},
-	{{ 0.5f, -0.5f, -2.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 1.0f}},
-	{{ 0.5f,  0.5f, -2.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 0.0f}},
-	{{-0.5f,  0.5f, -2.0f}, {1.f, 1.f, 1.f}, {0.0f, 0.0f}},
+	{{-0.5f,  0.5f, 0.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 0.0f}},
+	{{ 0.5f,  0.5f, 0.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 0.0f}},
+	{{ 0.5f, -0.5f, 0.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 1.0f}},
+	{{-0.5f, -0.5f, 0.0f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}},
+	//{{-0.5f, -0.5f, -2.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 1.0f}},
+	//{{ 0.5f, -0.5f, -2.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 1.0f}},
+	//{{ 0.5f,  0.5f, -2.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 0.0f}},
+	//{{-0.5f,  0.5f, -2.0f}, {1.f, 1.f, 1.f}, {0.0f, 0.0f}},
 
-	{{ 0.25f, -0.5f, 0.5f}, {1.f, 0.f, 0.f}, {0.0f, 0.0f}},
-	{{-0.25f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}, {1.0f, 0.0f}},
-	{{ 0.75f,  0.5f, 0.5f}, {0.f, 0.f, 1.f}, {1.0f, 1.0f}},
-	{{-0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}}
+	{{ -0.25f,  0.5f, 0.5f}, {1.f, 0.f, 0.f}, {0.0f, 0.0f}},
+	{{  0.75f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}, {1.0f, 0.0f}},
+	{{  0.25f, -0.5f, 0.5f}, {0.f, 0.f, 1.f}, {1.0f, 1.0f}},
+	{{ -0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}}
 };
 
 const std::vector<uint32_t> indices = {
-	0, 1, 2,
-	2, 3, 0,
+	2, 1, 0,
+	0, 3, 2,
 
-	4, 6, 5,
-	4, 5, 7
+	6, 5, 4,
+	4, 7, 6
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -42,6 +42,12 @@ const std::vector<uint32_t> indices = {
 // Initializes the renderer in its entirety
 skeleton::Renderer::Renderer()
 {
+	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	{
+		SKL_LOG("SDL ERROR", "%s", SDL_GetError());
+		throw "SDL failure";
+	}
+
 	uint32_t sdlFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_INPUT_FOCUS;
 	window = SDL_CreateWindow(
 		"Skeleton Application",
@@ -50,6 +56,8 @@ skeleton::Renderer::Renderer()
 		800,
 		600,
 		sdlFlags);
+	SDL_SetRelativeMouseMode(SDL_TRUE);
+	SDL_SetWindowGrab(window, SDL_TRUE);
 
 	CreateInstance();
 	CreateDevice();
@@ -75,21 +83,20 @@ skeleton::Renderer::Renderer()
 
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
+	float camSpeed = 2.f;
+	float mouseSensativity = 0.1f;
+	float pitch = 0.f, yaw = -90.f;
+
+	glm::vec3 camFront = {0, 0, -1};
+	glm::vec3 camPos = {0, 0, 3};
+
+	auto prevTime = std::chrono::high_resolution_clock::now();
+
 	while (stayOpen)
 	{
 		auto curTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
-
-		mvp.model = glm::mat4(1.0f);
-		//mvp.model = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.f, 0.f, 1.f));
-		//mvp.view = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-		mvp.view = glm::mat4(1.0f);
-		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
-		mvp.proj[1][1] *= -1;
-
-		bufferManager->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
-
-		RenderFrame();
+		float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - prevTime).count();
 
 		while (SDL_PollEvent(&e) != 0)
 		{
@@ -97,7 +104,47 @@ skeleton::Renderer::Renderer()
 			{
 				stayOpen = false;
 			}
+			if (e.type == SDL_MOUSEMOTION)
+			{
+				yaw += e.motion.xrel * mouseSensativity;
+				pitch -= e.motion.yrel * mouseSensativity;
+				glm::clamp(pitch, -89.f, 89.f);
+
+				camFront.x = (float)(glm::cos(glm::radians(yaw)) * glm::cos(glm::radians(pitch)));
+				camFront.y = (float)glm::sin(glm::radians(pitch));
+				camFront.z = (float)(glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch)));
+				camFront = glm::normalize(camFront);
+			}
 		}
+
+		int count = 0;
+		const Uint8* keys = SDL_GetKeyboardState(&count);
+		if (keys[SDL_SCANCODE_W])
+			camPos += camFront * camSpeed * deltaTime;
+		if (keys[SDL_SCANCODE_S])
+			camPos -= camFront * camSpeed * deltaTime;
+		if (keys[SDL_SCANCODE_D])
+			camPos += glm::normalize(glm::cross(camFront, { 0.f, 1.f, 0.f })) * camSpeed * deltaTime;
+		if (keys[SDL_SCANCODE_A])
+			camPos -= glm::normalize(glm::cross(camFront, { 0.f, 1.f, 0.f })) * camSpeed * deltaTime;
+		if (keys[SDL_SCANCODE_E])
+			camPos += glm::vec3(0.f, 1.f, 0.f) * camSpeed * deltaTime;
+		if (keys[SDL_SCANCODE_Q])
+			camPos -= glm::vec3(0.f, 1.f, 0.f) * camSpeed * deltaTime;
+
+		mvp.model = glm::mat4(1.0f);
+		//mvp.model = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.f, 0.f, 1.f));
+		mvp.view = glm::lookAt(camPos, camPos + camFront, glm::vec3(0.f, 1.f, 0.f));
+		//mvp.view = glm::mat4(1.0f);
+		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
+		mvp.proj[1][1] *= -1;
+
+		bufferManager->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
+
+		RenderFrame();
+
+
+		prevTime = curTime;
 	}
 
 	vkDeviceWaitIdle(*device);
@@ -289,7 +336,6 @@ void skeleton::Renderer::CreateRenderer()
 	CreatePipelineLayout();
 	CreatePipeline();
 
-	CreateDepthImage();
 	CreateFrameBuffers();
 
 	//RecordCommandBuffers();
@@ -301,6 +347,11 @@ void skeleton::Renderer::CleanupRenderer()
 	{
 		vkDestroyFramebuffer(*device, frameBuffers[i], nullptr);
 	}
+
+	SKL_PRINT_SLIM("Destory Depth ------------------------------");
+	vkDestroyImage(*device, depthImage, nullptr);
+	vkFreeMemory(*device, depthMemory, nullptr);
+	vkDestroyImageView(*device, depthImageView, nullptr);
 
 	vkDestroyPipeline(*device, pipeline, nullptr);
 	vkDestroyPipelineLayout(*device, pipelineLayout, nullptr);
@@ -630,7 +681,7 @@ void skeleton::Renderer::CreateSwapchain()
 	swapchainImageViews.resize(imageCount);
 	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		swapchainImageViews[i] = CreateImageView(swapchainFormat, swapchainImages[i]);
+		swapchainImageViews[i] = CreateImageView(swapchainFormat, VK_IMAGE_ASPECT_COLOR_BIT, swapchainImages[i]);
 	}
 }
 
@@ -640,7 +691,6 @@ void skeleton::Renderer::CreateRenderpass()
 	colorDesc.format = swapchainFormat;
 	colorDesc.samples = VK_SAMPLE_COUNT_1_BIT;
 	colorDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	//colorDesc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	colorDesc.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 	colorDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	colorDesc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -651,17 +701,43 @@ void skeleton::Renderer::CreateRenderpass()
 	colorRef.attachment = 0;
 	colorRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+	VkAttachmentDescription depthDesc = {};
+	depthDesc.format = FindDepthFormat();
+	depthDesc.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthDesc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthDesc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthDesc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthDesc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthDesc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthDesc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthRef = {};
+	depthRef.attachment = 1;
+	depthRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 	VkSubpassDescription subpass = {};
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorRef;
+	subpass.pDepthStencilAttachment = &depthRef;
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkAttachmentDescription attachments[] = {colorDesc, depthDesc};
 	VkRenderPassCreateInfo creteInfo = {};
 	creteInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	creteInfo.attachmentCount = 1;
-	creteInfo.pAttachments = &colorDesc;
+	creteInfo.attachmentCount = 2;
+	creteInfo.pAttachments = attachments;
 	creteInfo.subpassCount = 1;
 	creteInfo.pSubpasses = &subpass;
+	creteInfo.dependencyCount = 1;
+	creteInfo.pDependencies = &dependency;
 
 	SKL_ASSERT_VK(
 		vkCreateRenderPass(*device, &creteInfo, nullptr, &renderpass),
@@ -731,7 +807,8 @@ void skeleton::Renderer::CreatePipeline()
 	rasterStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	//rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterStateInfo.cullMode = VK_CULL_MODE_NONE;
 	rasterStateInfo.rasterizerDiscardEnable = VK_TRUE;
 	rasterStateInfo.lineWidth = 1.f;
 	rasterStateInfo.depthBiasEnable = VK_FALSE;
@@ -750,7 +827,10 @@ void skeleton::Renderer::CreatePipeline()
 	VkPipelineDepthStencilStateCreateInfo depthStateInfo = {};
 	depthStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStateInfo.depthTestEnable = VK_TRUE;
+	depthStateInfo.depthWriteEnable = VK_TRUE;
 	depthStateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+	depthStateInfo.back.compareOp = VK_COMPARE_OP_ALWAYS;
+	depthStateInfo.depthBoundsTestEnable = VK_FALSE;
 
 	// Color Blend State
 	//=================================================
@@ -799,7 +879,7 @@ void skeleton::Renderer::CreatePipeline()
 	createInfo.pInputAssemblyState = &inputAssemblyStateInfo;
 	createInfo.pRasterizationState = &rasterStateInfo;
 	createInfo.pMultisampleState = &multisampleStateInfo;
-	createInfo.pDepthStencilState = nullptr; //&depthStateInfo;
+	createInfo.pDepthStencilState = &depthStateInfo;
 	createInfo.pColorBlendState = &blendStateInfo;
 	createInfo.pDynamicState = &dynamicStateInfo;
 
@@ -819,7 +899,18 @@ void skeleton::Renderer::CreatePipeline()
 
 void skeleton::Renderer::CreateDepthImage()
 {
+	VkFormat depthFormat = FindDepthFormat();
+	CreateImage(
+		swapchainExtent.width,
+		swapchainExtent.height,
+		depthFormat,
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		depthImage,
+		depthMemory);
 
+	depthImageView = CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage);
 }
 
 void skeleton::Renderer::CreateFrameBuffers()
@@ -828,7 +919,6 @@ void skeleton::Renderer::CreateFrameBuffers()
 	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	createInfo.renderPass = renderpass;
 	createInfo.layers = 1;
-	createInfo.attachmentCount = 1;
 	createInfo.width = swapchainExtent.width;
 	createInfo.height = swapchainExtent.height;
 
@@ -837,7 +927,9 @@ void skeleton::Renderer::CreateFrameBuffers()
 
 	for (uint32_t i = 0; i < imageCount; i++)
 	{
-		createInfo.pAttachments = &swapchainImageViews[i];
+		VkImageView attachments[] = {swapchainImageViews[i], depthImageView};
+		createInfo.attachmentCount = 2;
+		createInfo.pAttachments = attachments;
 
 		SKL_ASSERT_VK(
 			vkCreateFramebuffer(*device, &createInfo, nullptr, &frameBuffers[i]),
@@ -851,14 +943,14 @@ void skeleton::Renderer::RecordCommandBuffers()
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-	VkClearValue clearValues[1] = {};
+	VkClearValue clearValues[2] = {};
 	clearValues[0].color = {0.20784313725f, 0.21568627451f, 0.21568627451f, 1.0f};
-	//clearValues[1].depthStencil = {1, 0};
+	clearValues[1].depthStencil = {1, 0};
 
 	VkRenderPassBeginInfo rpBeginInfo = {};
 	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 	rpBeginInfo.renderPass = renderpass;
-	rpBeginInfo.clearValueCount = 1;
+	rpBeginInfo.clearValueCount = 2;
 	rpBeginInfo.pClearValues = clearValues;
 	rpBeginInfo.renderArea.extent = swapchainExtent;
 	rpBeginInfo.renderArea.offset = {0, 0};
@@ -954,7 +1046,8 @@ uint32_t skeleton::Renderer::GetPresentIndex(
 }
 
 VkImageView skeleton::Renderer::CreateImageView(
-	const VkFormat _format,
+	VkFormat _format,
+	VkImageAspectFlags _aspect,
 	const VkImage& _image)
 {
 	VkImageViewCreateInfo createInfo = {};
@@ -964,7 +1057,7 @@ VkImageView skeleton::Renderer::CreateImageView(
 	createInfo.subresourceRange.baseMipLevel = 0;
 	createInfo.subresourceRange.layerCount     = 1;
 	createInfo.subresourceRange.baseArrayLayer = 0;
-	createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	createInfo.subresourceRange.aspectMask = _aspect;
 	createInfo.image = _image;
 	createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1130,7 +1223,7 @@ void skeleton::Renderer::CreateTextureImage(
 
 	bufferManager->RemoveAtIndex(stagingIndex);
 
-	textureImageView = CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, textureImage);
+	textureImageView = CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureImage);
 
 	CreateSampler();
 }
@@ -1247,5 +1340,31 @@ void skeleton::Renderer::CopyBufferToImage(
 		&region);
 
 	device->EndSingleTimeCommand(command, device->transientPool, device->transferQueue);
+}
+
+VkFormat skeleton::Renderer::FindDepthFormat()
+{
+	return FindSupportedFormat(
+		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+VkFormat skeleton::Renderer::FindSupportedFormat(
+	const std::vector<VkFormat>& _candidates,
+	VkImageTiling _tiling,
+	VkFormatFeatureFlags _features)
+{
+	for (VkFormat format : _candidates)
+	{
+		VkFormatProperties properties;
+		vkGetPhysicalDeviceFormatProperties(device->physicalDevice, format, &properties);
+
+		if (_tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & _features) == _features)
+			return format;
+		else if (_tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & _features) == _features)
+			return format;
+	}
+	throw std::runtime_error("Failed to find a suitable format");
 }
 

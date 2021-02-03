@@ -19,8 +19,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="res\default.frag" />
-    <None Include="res\default.vert" />
-  </ItemGroup>
 </Project>

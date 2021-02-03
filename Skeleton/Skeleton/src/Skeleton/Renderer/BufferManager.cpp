@@ -2,6 +2,7 @@
 #include "pch.h"
 #include "Skeleton/Core/Common.h"
 #include "BufferManager.h"
+#include "Skeleton/Renderer/RendererBackend.h"
 
 skeleton::BufferManager::~BufferManager()
 {
@@ -10,8 +11,8 @@ skeleton::BufferManager::~BufferManager()
 	{
 		if (GetIndexBitMapAt(i))
 		{
-			vkFreeMemory(*m_device, m_memories[i], nullptr);
-			vkDestroyBuffer(*m_device, m_buffers[i], nullptr);
+			vkFreeMemory(vulkanContext.device, m_memories[i], nullptr);
+			vkDestroyBuffer(vulkanContext.device, m_buffers[i], nullptr);
 		}
 	}
 }
@@ -66,8 +67,8 @@ void skeleton::BufferManager::RemoveAtIndex(
 	uint32_t _index)
 {
 	SetIndexBitMapAt(_index, false);
-	vkFreeMemory(*m_device, m_memories[_index], nullptr);
-	vkDestroyBuffer(*m_device, m_buffers[_index], nullptr);
+	vkFreeMemory(vulkanContext.device, m_memories[_index], nullptr);
+	vkDestroyBuffer(vulkanContext.device, m_buffers[_index], nullptr);
 }
 
 uint32_t skeleton::BufferManager::GetFirstAvailableIndex()
@@ -136,7 +137,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 
 	VkBuffer tmpBuffer;
 	SKL_ASSERT_VK(
-		vkCreateBuffer(*m_device, &createInfo, nullptr, &tmpBuffer),
+		vkCreateBuffer(vulkanContext.device, &createInfo, nullptr, &tmpBuffer),
 		"Failed to create vert buffer");
 
 	if (index < static_cast<uint32_t>(m_buffers.size()))
@@ -150,7 +151,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 	_buffer = m_buffers[index];
 
 	VkMemoryRequirements memReq;
-	vkGetBufferMemoryRequirements(*m_device, _buffer, &memReq);
+	vkGetBufferMemoryRequirements(vulkanContext.device, _buffer, &memReq);
 
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -161,7 +162,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 
 	VkDeviceMemory tmpMemory;
 	SKL_ASSERT_VK(
-		vkAllocateMemory(*m_device, &allocInfo, nullptr, &tmpMemory),
+		vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &tmpMemory),
 		"Failed to allocate vert memory");
 
 	if (index < static_cast<uint32_t>(m_memories.size()))
@@ -174,7 +175,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 	}
 	_memory = m_memories[index];
 
-	vkBindBufferMemory(*m_device, _buffer, _memory, 0);
+	vkBindBufferMemory(vulkanContext.device, _buffer, _memory, 0);
 
 	return index;
 }
@@ -195,7 +196,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 
 	VkBuffer tmpBuffer;
 	SKL_ASSERT_VK(
-		vkCreateBuffer(*m_device, &createInfo, nullptr, &tmpBuffer),
+		vkCreateBuffer(vulkanContext.device, &createInfo, nullptr, &tmpBuffer),
 		"Failed to create vert buffer");
 
 	if (index < static_cast<uint32_t>(m_buffers.size()))
@@ -208,7 +209,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 	}
 
 	VkMemoryRequirements memReq;
-	vkGetBufferMemoryRequirements(*m_device, m_buffers[index], &memReq);
+	vkGetBufferMemoryRequirements(vulkanContext.device, m_buffers[index], &memReq);
 
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -219,7 +220,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 
 	VkDeviceMemory tmpMemory;
 	SKL_ASSERT_VK(
-		vkAllocateMemory(*m_device, &allocInfo, nullptr, &tmpMemory),
+		vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &tmpMemory),
 		"Failed to allocate vert memory");
 
 	if (index < static_cast<uint32_t>(m_memories.size()))
@@ -231,7 +232,7 @@ uint32_t skeleton::BufferManager::CreateBuffer(
 		m_memories.push_back(tmpMemory);
 	}
 
-	vkBindBufferMemory(*m_device, m_buffers[index], m_memories[index], 0);
+	vkBindBufferMemory(vulkanContext.device, m_buffers[index], m_memories[index], 0);
 
 	return index;
 }
@@ -242,9 +243,9 @@ void skeleton::BufferManager::FillBuffer(
 	VkDeviceSize _size)
 {
 	void* tmpData;
-	vkMapMemory(*m_device, _memory, 0, _size, 0, &tmpData);
+	vkMapMemory(vulkanContext.device, _memory, 0, _size, 0, &tmpData);
 	memcpy(tmpData, _data, static_cast<size_t>(_size));
-	vkUnmapMemory(*m_device, _memory);
+	vkUnmapMemory(vulkanContext.device, _memory);
 }
 
 void skeleton::BufferManager::CopyBuffer(
@@ -252,7 +253,7 @@ void skeleton::BufferManager::CopyBuffer(
 	VkBuffer _dst,
 	VkDeviceSize _size)
 {
-	VkCommandBuffer copyCommand = m_device->BeginSingleTimeCommand(m_device->transientPool);
+	VkCommandBuffer copyCommand = BeginSingleTimeCommand(transientPool);
 
 	VkBufferCopy region = {};
 	region.size = _size;
@@ -261,7 +262,7 @@ void skeleton::BufferManager::CopyBuffer(
 
 	vkCmdCopyBuffer(copyCommand, _src, _dst, 1, &region);
 
-	m_device->EndSingleTimeCommand(copyCommand, m_device->transientPool, m_device->transferQueue);
+	EndSingleTimeCommand(copyCommand, transientPool, vulkanContext.transferQueue);
 }
 
 uint32_t skeleton::BufferManager::FindMemoryType(
@@ -269,7 +270,7 @@ uint32_t skeleton::BufferManager::FindMemoryType(
 	VkMemoryPropertyFlags _flags)
 {
 	VkPhysicalDeviceMemoryProperties props;
-	vkGetPhysicalDeviceMemoryProperties(m_device->physicalDevice, &props);
+	vkGetPhysicalDeviceMemoryProperties(vulkanContext.gpu.device, &props);
 
 	for (uint32_t i = 0; i < props.memoryTypeCount; i++)
 	{

@@ -1,4 +1,5 @@
 
+#pragma hdrstop
 #include "pch.h"
 #include <set>
 #include <string>
@@ -7,8 +8,9 @@
 #include "stb/stb_image.h"
 
 #include "Renderer.h"
+#include "RendererBackend.h"
 #include "Skeleton/Core/Common.h"
-#include "Skeleton/Core/AssetLoader.h"
+#include "Skeleton/Core/FileSystem.h"
 #include "Skeleton/Core/Vertex.h"
 
 const std::vector<skeleton::Vertex> verts = {
@@ -16,10 +18,6 @@ const std::vector<skeleton::Vertex> verts = {
 	{{ 0.5f,  0.5f, 0.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 0.0f}},
 	{{ 0.5f, -0.5f, 0.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 1.0f}},
 	{{-0.5f, -0.5f, 0.0f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}},
-	//{{-0.5f, -0.5f, -2.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 1.0f}},
-	//{{ 0.5f, -0.5f, -2.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 1.0f}},
-	//{{ 0.5f,  0.5f, -2.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 0.0f}},
-	//{{-0.5f,  0.5f, -2.0f}, {1.f, 1.f, 1.f}, {0.0f, 0.0f}},
 
 	{{ -0.25f,  0.5f, 0.5f}, {1.f, 0.f, 0.f}, {0.0f, 0.0f}},
 	{{  0.75f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}, {1.0f, 0.0f}},
@@ -40,33 +38,28 @@ const std::vector<uint32_t> indices = {
 //////////////////////////////////////////////////////////////////////////
 
 // Initializes the renderer in its entirety
-skeleton::Renderer::Renderer()
+skeleton::Renderer::Renderer(
+	const std::vector<const char*>& _extraExtensions,
+	SDL_Window* _window) : window(_window)
 {
-	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	// Include the extra extensions specified
+	for (const char* additionalExtension : _extraExtensions)
 	{
-		SKL_LOG("SDL ERROR", "%s", SDL_GetError());
-		throw "SDL failure";
+		instanceExtensions.push_back(additionalExtension);
 	}
-
-	uint32_t sdlFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_INPUT_FOCUS;
-	window = SDL_CreateWindow(
-		"Skeleton Application",
-		SDL_WINDOWPOS_UNDEFINED,
-		SDL_WINDOWPOS_UNDEFINED,
-		800,
-		600,
-		sdlFlags);
-	SDL_SetRelativeMouseMode(SDL_TRUE);
-	SDL_SetWindowGrab(window, SDL_TRUE);
 
 	CreateInstance();
 	CreateDevice();
-	bufferManager = new BufferManager(device);
+	bufferManager = new BufferManager();
 	CreateCommandPools();
 
 	CreateDescriptorSetLayout();
 
 	CreateRenderer();
+
+	cam.yaw = -90.f;
+	cam.position.z = 3;
+	cam.UpdateProjection(swapchainExtent.width / float(swapchainExtent.height));
 
 	CreateTextureImage("res/TestImage.png");
 	CreateModelBuffers();
@@ -75,109 +68,34 @@ skeleton::Renderer::Renderer()
 	CreateSyncObjects();
 	CreateCommandBuffers();
 	RecordCommandBuffers();
-
-	SKL_PRINT("End Init", "-------------------------------------------------");
-
-	bool stayOpen = true;
-	SDL_Event e;
-
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	float camSpeed = 2.f;
-	float mouseSensativity = 0.1f;
-	float pitch = 0.f, yaw = -90.f;
-
-	glm::vec3 camFront = {0, 0, -1};
-	glm::vec3 camPos = {0, 0, 3};
-
-	auto prevTime = std::chrono::high_resolution_clock::now();
-
-	while (stayOpen)
-	{
-		auto curTime = std::chrono::high_resolution_clock::now();
-		float time = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
-		float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - prevTime).count();
-
-		while (SDL_PollEvent(&e) != 0)
-		{
-			if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE))
-			{
-				stayOpen = false;
-			}
-			if (e.type == SDL_MOUSEMOTION)
-			{
-				yaw += e.motion.xrel * mouseSensativity;
-				pitch -= e.motion.yrel * mouseSensativity;
-				glm::clamp(pitch, -89.f, 89.f);
-
-				camFront.x = (float)(glm::cos(glm::radians(yaw)) * glm::cos(glm::radians(pitch)));
-				camFront.y = (float)glm::sin(glm::radians(pitch));
-				camFront.z = (float)(glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch)));
-				camFront = glm::normalize(camFront);
-			}
-		}
-
-		int count = 0;
-		const Uint8* keys = SDL_GetKeyboardState(&count);
-		if (keys[SDL_SCANCODE_W])
-			camPos += camFront * camSpeed * deltaTime;
-		if (keys[SDL_SCANCODE_S])
-			camPos -= camFront * camSpeed * deltaTime;
-		if (keys[SDL_SCANCODE_D])
-			camPos += glm::normalize(glm::cross(camFront, { 0.f, 1.f, 0.f })) * camSpeed * deltaTime;
-		if (keys[SDL_SCANCODE_A])
-			camPos -= glm::normalize(glm::cross(camFront, { 0.f, 1.f, 0.f })) * camSpeed * deltaTime;
-		if (keys[SDL_SCANCODE_E])
-			camPos += glm::vec3(0.f, 1.f, 0.f) * camSpeed * deltaTime;
-		if (keys[SDL_SCANCODE_Q])
-			camPos -= glm::vec3(0.f, 1.f, 0.f) * camSpeed * deltaTime;
-
-		mvp.model = glm::mat4(1.0f);
-		//mvp.model = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.f, 0.f, 1.f));
-		mvp.view = glm::lookAt(camPos, camPos + camFront, glm::vec3(0.f, 1.f, 0.f));
-		//mvp.view = glm::mat4(1.0f);
-		mvp.proj = glm::perspective(glm::radians(45.f), swapchainExtent.width / (float)swapchainExtent.height, 0.1f, 10.f);
-		mvp.proj[1][1] *= -1;
-
-		bufferManager->FillBuffer(mvpMemory, &mvp, sizeof(mvp));
-
-		RenderFrame();
-
-
-		prevTime = curTime;
-	}
-
-	vkDeviceWaitIdle(*device);
 }
 
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
-	vkFreeMemory(*device, textureMemory, nullptr);
-	vkDestroySampler(*device, textureSampler, nullptr);
-	vkDestroyImageView(*device, textureImageView, nullptr);
-	vkDestroyImage(*device, textureImage, nullptr);
+	vkDeviceWaitIdle(vulkanContext.device);
+	vkFreeMemory(vulkanContext.device, textureMemory, nullptr);
+	vkDestroySampler(vulkanContext.device, textureSampler, nullptr);
+	vkDestroyImageView(vulkanContext.device, textureImageView, nullptr);
+	vkDestroyImage(vulkanContext.device, textureImage, nullptr);
 
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
-		vkDestroyFence(*device, flightFences[i], nullptr);
-		vkDestroySemaphore(*device, imageAvailableSemaphores[i], nullptr);
-		vkDestroySemaphore(*device, renderCompleteSemaphores[i], nullptr);
+		vkDestroyFence(vulkanContext.device, flightFences[i], nullptr);
+		vkDestroySemaphore(vulkanContext.device, imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(vulkanContext.device, renderCompleteSemaphores[i], nullptr);
 	}
 
-	vkDestroyDescriptorSetLayout(*device, descriptorSetLayout, nullptr);
-	vkDestroyDescriptorPool(*device, descriptorPool, nullptr);
+	vkDestroyDescriptorSetLayout(vulkanContext.device, descriptorSetLayout, nullptr);
+	vkDestroyDescriptorPool(vulkanContext.device, descriptorPool, nullptr);
 
 	CleanupRenderer();
 
-	vkDestroyCommandPool(*device, graphicsPool, nullptr);
+	vkDestroyCommandPool(vulkanContext.device, graphicsPool, nullptr);
 
 	delete(bufferManager);
-	delete(device);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
-
-	SDL_DestroyWindow(window);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -186,14 +104,14 @@ skeleton::Renderer::~Renderer()
 
 void skeleton::Renderer::RenderFrame()
 {
-	vkWaitForFences(*device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	vkWaitForFences(vulkanContext.device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(*device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+	vkAcquireNextImageKHR(vulkanContext.device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 	if (imageIsInFlightFences[imageIndex] != VK_NULL_HANDLE)
 	{
-		vkWaitForFences(*device, 1, &imageIsInFlightFences[imageIndex], VK_TRUE, UINT64_MAX);
+		vkWaitForFences(vulkanContext.device, 1, &imageIsInFlightFences[imageIndex], VK_TRUE, UINT64_MAX);
 	}
 	imageIsInFlightFences[imageIndex] = flightFences[currentFrame];
 
@@ -209,10 +127,10 @@ void skeleton::Renderer::RenderFrame()
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = &renderCompleteSemaphores[currentFrame];
 
-	vkResetFences(*device, 1, &flightFences[currentFrame]);
+	vkResetFences(vulkanContext.device, 1, &flightFences[currentFrame]);
 
 	SKL_ASSERT_VK(
-		vkQueueSubmit(device->graphicsQueue, 1, &submitInfo, flightFences[currentFrame]),
+		vkQueueSubmit(vulkanContext.graphicsQueue, 1, &submitInfo, flightFences[currentFrame]),
 		"Failed to submit draw command");
 
 	VkPresentInfoKHR presentInfo = {};
@@ -223,7 +141,7 @@ void skeleton::Renderer::RenderFrame()
 	presentInfo.pSwapchains = &swapchain;
 	presentInfo.pImageIndices = &imageIndex;
 
-	vkQueuePresentKHR(device->presentQueue, &presentInfo);
+	vkQueuePresentKHR(vulkanContext.presentQueue, &presentInfo);
 
 	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
 }
@@ -250,7 +168,7 @@ void skeleton::Renderer::CreateDescriptorSetLayout()
 	createInfo.pBindings = bindings;
 
 	SKL_ASSERT_VK(
-		vkCreateDescriptorSetLayout(*device, &createInfo, nullptr, &descriptorSetLayout),
+		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &descriptorSetLayout),
 		"Failed to create descriptor set layout");
 }
 
@@ -269,7 +187,7 @@ void skeleton::Renderer::CreateDescriptorPool()
 	createInfo.maxSets = 1;
 
 	SKL_ASSERT_VK(
-		vkCreateDescriptorPool(*device, &createInfo, nullptr, &descriptorPool),
+		vkCreateDescriptorPool(vulkanContext.device, &createInfo, nullptr, &descriptorPool),
 		"Failed to create descriptor pool");
 }
 
@@ -282,7 +200,7 @@ void skeleton::Renderer::CreateDescriptorSet()
 	allocInfo.pSetLayouts = &descriptorSetLayout;
 
 	SKL_ASSERT_VK(
-		vkAllocateDescriptorSets(*device, &allocInfo, &descriptorSet),
+		vkAllocateDescriptorSets(vulkanContext.device, &allocInfo, &descriptorSet),
 		"Failed to allocate descriptor set");
 
 	// mvp buffer
@@ -318,7 +236,7 @@ void skeleton::Renderer::CreateDescriptorSet()
 	descWrites[1].pImageInfo = &imageInfo;
 	descWrites[1].pTexelBufferView = nullptr;
 
-	vkUpdateDescriptorSets(*device, 2, descWrites, 0, nullptr);
+	vkUpdateDescriptorSets(vulkanContext.device, 2, descWrites, 0, nullptr);
 
 }
 
@@ -345,29 +263,28 @@ void skeleton::Renderer::CleanupRenderer()
 {
 	for (uint32_t i = 0; i < (uint32_t)frameBuffers.size(); i++)
 	{
-		vkDestroyFramebuffer(*device, frameBuffers[i], nullptr);
+		vkDestroyFramebuffer(vulkanContext.device, frameBuffers[i], nullptr);
 	}
 
-	SKL_PRINT_SLIM("Destory Depth ------------------------------");
-	vkDestroyImage(*device, depthImage, nullptr);
-	vkFreeMemory(*device, depthMemory, nullptr);
-	vkDestroyImageView(*device, depthImageView, nullptr);
+	vkDestroyImage(vulkanContext.device, depthImage, nullptr);
+	vkFreeMemory(vulkanContext.device, depthMemory, nullptr);
+	vkDestroyImageView(vulkanContext.device, depthImageView, nullptr);
 
-	vkDestroyPipeline(*device, pipeline, nullptr);
-	vkDestroyPipelineLayout(*device, pipelineLayout, nullptr);
-	vkDestroyRenderPass(*device, renderpass, nullptr);
+	vkDestroyPipeline(vulkanContext.device, pipeline, nullptr);
+	vkDestroyPipelineLayout(vulkanContext.device, pipelineLayout, nullptr);
+	vkDestroyRenderPass(vulkanContext.device, renderpass, nullptr);
 
 	for (const auto& view : swapchainImageViews)
 	{
-		vkDestroyImageView(*device, view, nullptr);
+		vkDestroyImageView(vulkanContext.device, view, nullptr);
 	}
 
-	vkDestroySwapchainKHR(*device, swapchain, nullptr);
+	vkDestroySwapchainKHR(vulkanContext.device, swapchain, nullptr);
 }
 
 void skeleton::Renderer::RecreateRenderer()
 {
-	vkDeviceWaitIdle(*device);
+	vkDeviceWaitIdle(vulkanContext.device);
 	CleanupRenderer();
 	CreateRenderer();
 }
@@ -379,16 +296,6 @@ void skeleton::Renderer::RecreateRenderer()
 // Creates the vkInstance & vkSurface
 void skeleton::Renderer::CreateInstance()
 {
-	// Fill instance extensions & layers
-	uint32_t sdlExtensionCount;
-	SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, nullptr);
-	std::vector<const char*> sdlExtensions(sdlExtensionCount);
-	SDL_Vulkan_GetInstanceExtensions(window, &sdlExtensionCount, sdlExtensions.data());
-	for (const auto& sdlExt : sdlExtensions)
-	{
-		instanceExtensions.push_back(sdlExt);
-	}
-
 	// Basic application metadata
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -430,13 +337,13 @@ void skeleton::Renderer::CreateDevice()
 		queueIndices[1],
 		queueIndices[2]);
 
-	device = new VulkanDevice(physicalDevice);
+	vulkanContext.gpu.device = physicalDevice;
 
-	device->queueIndices.graphics = queueIndices[0];
-	device->queueIndices.present  = queueIndices[1];
-	device->queueIndices.transfer = queueIndices[2];
+	vulkanContext.graphicsIdx = queueIndices[0];
+	vulkanContext.presentIdx  = queueIndices[1];
+	vulkanContext.transferIdx = queueIndices[2];
 
-	device->CreateLogicalDevice(
+	CreateLogicalDevice(
 		{queueIndices[0], queueIndices[1], queueIndices[2]},
 		deviceExtensions,
 		validationLayer);
@@ -530,7 +437,7 @@ void skeleton::Renderer::ChoosePhysicalDevice(
 
 void skeleton::Renderer::CreateCommandPools()
 {
-	device->CreateCommandPool(graphicsPool, device->queueIndices.graphics);
+	CreateCommandPool(graphicsPool, vulkanContext.graphicsIdx);
 }
 
 void skeleton::Renderer::CreateSyncObjects()
@@ -550,13 +457,13 @@ void skeleton::Renderer::CreateSyncObjects()
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
 		SKL_ASSERT_VK(
-			vkCreateFence(*device, &fenceInfo, nullptr, &flightFences[i]),
+			vkCreateFence(vulkanContext.device, &fenceInfo, nullptr, &flightFences[i]),
 			"Failed to create sync fence");
 		SKL_ASSERT_VK(
-			vkCreateSemaphore(*device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]),
+			vkCreateSemaphore(vulkanContext.device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]),
 			"Failed to create image semaphore");
 		SKL_ASSERT_VK(
-			vkCreateSemaphore(*device, &semaphoreInfo, nullptr, &renderCompleteSemaphores[i]),
+			vkCreateSemaphore(vulkanContext.device, &semaphoreInfo, nullptr, &renderCompleteSemaphores[i]),
 			"Failed to create render semaphore");
 	}
 }
@@ -573,7 +480,7 @@ void skeleton::Renderer::CreateCommandBuffers()
 	allocInfo.commandPool = graphicsPool;
 
 	SKL_ASSERT_VK(
-		vkAllocateCommandBuffers(*device, &allocInfo, commandBuffers.data()),
+		vkAllocateCommandBuffers(vulkanContext.device, &allocInfo, commandBuffers.data()),
 		"Failed to allocate command buffers");
 }
 
@@ -584,15 +491,15 @@ void skeleton::Renderer::CreateCommandBuffers()
 void skeleton::Renderer::CreateSwapchain()
 {
 	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(device->physicalDevice, &props);
+	vkGetPhysicalDeviceProperties(vulkanContext.gpu.device, &props);
 	VkPhysicalDeviceFeatures features;
-	vkGetPhysicalDeviceFeatures(device->physicalDevice, &features);
+	vkGetPhysicalDeviceFeatures(vulkanContext.gpu.device, &features);
 
 	// Find the best format
 	uint32_t surfaceFormatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, surface, &surfaceFormatCount, nullptr);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(vulkanContext.gpu.device, surface, &surfaceFormatCount, nullptr);
 	std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(device->physicalDevice, surface, &surfaceFormatCount, surfaceFormats.data());
+	vkGetPhysicalDeviceSurfaceFormatsKHR(vulkanContext.gpu.device, surface, &surfaceFormatCount, surfaceFormats.data());
 
 	VkSurfaceFormatKHR formatInfo = surfaceFormats[0];
 	for (const auto& p : surfaceFormats)
@@ -605,9 +512,9 @@ void skeleton::Renderer::CreateSwapchain()
 	}
 
 	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, surface, &presentModeCount, nullptr);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(vulkanContext.gpu.device, surface, &presentModeCount, nullptr);
 	std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(device->physicalDevice, surface, &presentModeCount, presentModes.data());
+	vkGetPhysicalDeviceSurfacePresentModesKHR(vulkanContext.gpu.device, surface, &presentModeCount, presentModes.data());
 
 	VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 	for (const auto& p : presentModes)
@@ -621,7 +528,7 @@ void skeleton::Renderer::CreateSwapchain()
 
 	// Get the device's extent
 	VkSurfaceCapabilitiesKHR capabilities;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device->physicalDevice, surface, &capabilities);
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkanContext.gpu.device, surface, &capabilities);
 	VkExtent2D extent;
 	if (capabilities.currentExtent.width != UINT32_MAX)
 	{
@@ -652,9 +559,9 @@ void skeleton::Renderer::CreateSwapchain()
 	createInfo.imageExtent = extent;
 	createInfo.minImageCount = imageCount;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	if (device->queueIndices.graphics != device->queueIndices.present)
+	if (vulkanContext.graphicsIdx != vulkanContext.presentIdx)
 	{
-		uint32_t sharedIndices[] = { device->queueIndices.graphics, device->queueIndices.present };
+		uint32_t sharedIndices[] = { vulkanContext.graphicsIdx, vulkanContext.presentIdx };
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 		createInfo.queueFamilyIndexCount = 2;
 		createInfo.pQueueFamilyIndices = sharedIndices;
@@ -668,15 +575,15 @@ void skeleton::Renderer::CreateSwapchain()
 	createInfo.presentMode = presentMode;
 
 	SKL_ASSERT_VK(
-		vkCreateSwapchainKHR(*device, &createInfo, nullptr, &swapchain),
+		vkCreateSwapchainKHR(vulkanContext.device, &createInfo, nullptr, &swapchain),
 		"Failed to create swapchain");
 
 	swapchainFormat = formatInfo.format;
 	swapchainExtent = extent;
 
-	vkGetSwapchainImagesKHR(*device, swapchain, &imageCount, nullptr);
+	vkGetSwapchainImagesKHR(vulkanContext.device, swapchain, &imageCount, nullptr);
 	swapchainImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(*device, swapchain, &imageCount, swapchainImages.data());
+	vkGetSwapchainImagesKHR(vulkanContext.device, swapchain, &imageCount, swapchainImages.data());
 
 	swapchainImageViews.resize(imageCount);
 	for (uint32_t i = 0; i < imageCount; i++)
@@ -740,7 +647,7 @@ void skeleton::Renderer::CreateRenderpass()
 	creteInfo.pDependencies = &dependency;
 
 	SKL_ASSERT_VK(
-		vkCreateRenderPass(*device, &creteInfo, nullptr, &renderpass),
+		vkCreateRenderPass(vulkanContext.device, &creteInfo, nullptr, &renderpass),
 		"Failed to create renderpass");
 }
 
@@ -755,7 +662,7 @@ void skeleton::Renderer::CreatePipelineLayout()
 	layoutInfo.pPushConstantRanges = nullptr;
 
 	SKL_ASSERT_VK(
-		vkCreatePipelineLayout(*device, &layoutInfo, nullptr, &pipelineLayout),
+		vkCreatePipelineLayout(vulkanContext.device, &layoutInfo, nullptr, &pipelineLayout),
 		"Failed to create pipeline layout");
 }
 
@@ -853,8 +760,8 @@ void skeleton::Renderer::CreatePipeline()
 
 	// Shader modules
 	//=================================================
-	VkShaderModule vertModule = CreateShaderModule("res\\default_vert.spv");
-	VkShaderModule fragModule = CreateShaderModule("res\\default_frag.spv");
+	VkShaderModule vertModule = CreateShaderModule("default_vert.spv");
+	VkShaderModule fragModule = CreateShaderModule("default_frag.spv");
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -890,11 +797,11 @@ void skeleton::Renderer::CreatePipeline()
 	createInfo.renderPass = renderpass;
 
 	SKL_ASSERT_VK(
-		vkCreateGraphicsPipelines(*device, nullptr, 1, &createInfo, nullptr, &pipeline),
+		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &pipeline),
 		"Failed to create graphics pipeline");
 
-	vkDestroyShaderModule(*device, vertModule, nullptr);
-	vkDestroyShaderModule(*device, fragModule, nullptr);
+	vkDestroyShaderModule(vulkanContext.device, vertModule, nullptr);
+	vkDestroyShaderModule(vulkanContext.device, fragModule, nullptr);
 }
 
 void skeleton::Renderer::CreateDepthImage()
@@ -932,7 +839,7 @@ void skeleton::Renderer::CreateFrameBuffers()
 		createInfo.pAttachments = attachments;
 
 		SKL_ASSERT_VK(
-			vkCreateFramebuffer(*device, &createInfo, nullptr, &frameBuffers[i]),
+			vkCreateFramebuffer(vulkanContext.device, &createInfo, nullptr, &frameBuffers[i]),
 			"Failed to create a framebuffer");
 	}
 }
@@ -1067,7 +974,7 @@ VkImageView skeleton::Renderer::CreateImageView(
 
 	VkImageView tmpView;
 	SKL_ASSERT_VK(
-		vkCreateImageView(*device, &createInfo, nullptr, &tmpView),
+		vkCreateImageView(vulkanContext.device, &createInfo, nullptr, &tmpView),
 		"Failed to create image view");
 
 	return tmpView;
@@ -1076,14 +983,17 @@ VkImageView skeleton::Renderer::CreateImageView(
 VkShaderModule skeleton::Renderer::CreateShaderModule(
 	const char* _directory)
 {
-	std::vector<char> shaderSource = skeleton::tools::LoadFileAsString(_directory);
+	std::string dir = "res\\Shaders\\";
+	dir.append(_directory);
+
+	std::vector<char> shaderSource = skeleton::tools::LoadFileAsString(dir.c_str());
 	VkShaderModuleCreateInfo moduleCreateInfo = {};
 	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	moduleCreateInfo.codeSize = shaderSource.size();
 	moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderSource.data());
 	VkShaderModule tmpModule;
 	SKL_ASSERT_VK(
-		vkCreateShaderModule(*device, &moduleCreateInfo, nullptr, &tmpModule),
+		vkCreateShaderModule(vulkanContext.device, &moduleCreateInfo, nullptr, &tmpModule),
 		"Failed to create shader module");
 
 	return tmpModule;
@@ -1144,11 +1054,11 @@ void skeleton::Renderer::CreateImage(
 	createInfo.flags = 0;
 
 	SKL_ASSERT_VK(
-		vkCreateImage(*device, &createInfo, nullptr, &_image),
+		vkCreateImage(vulkanContext.device, &createInfo, nullptr, &_image),
 		"Failed to create texture image");
 
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(*device, _image, &memRequirements);
+	vkGetImageMemoryRequirements(vulkanContext.device, _image, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -1158,10 +1068,10 @@ void skeleton::Renderer::CreateImage(
 		_memFlags);
 
 	SKL_ASSERT_VK(
-		vkAllocateMemory(*device, &allocInfo, nullptr, &_memory),
+		vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &_memory),
 		"Failed to allocate texture memory");
 
-	vkBindImageMemory(*device, _image, _memory, 0);
+	vkBindImageMemory(vulkanContext.device, _image, _memory, 0);
 }
 
 void skeleton::Renderer::CreateTextureImage(
@@ -1239,7 +1149,7 @@ void skeleton::Renderer::CreateSampler()
 	createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 	VkPhysicalDeviceProperties physicalProps = {};
-	vkGetPhysicalDeviceProperties(device->physicalDevice, &physicalProps);
+	vkGetPhysicalDeviceProperties(vulkanContext.gpu.device, &physicalProps);
 	createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	createInfo.unnormalizedCoordinates = VK_FALSE;
 	createInfo.compareEnable = VK_FALSE;
@@ -1255,7 +1165,7 @@ void skeleton::Renderer::CreateSampler()
 	createInfo.maxAnisotropy = physicalProps.limits.maxSamplerAnisotropy;
 
 	SKL_ASSERT_VK(
-		vkCreateSampler(*device, &createInfo, nullptr, &textureSampler),
+		vkCreateSampler(vulkanContext.device, &createInfo, nullptr, &textureSampler),
 		"Failed to create texture sampler");
 }
 
@@ -1265,7 +1175,7 @@ void skeleton::Renderer::TransitionImageLayout(
 	VkImageLayout _old,
 	VkImageLayout _new)
 {
-	VkCommandBuffer transitionCommand = device->BeginSingleTimeCommand(graphicsPool);
+	VkCommandBuffer transitionCommand = BeginSingleTimeCommand(graphicsPool);
 
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1307,7 +1217,7 @@ void skeleton::Renderer::TransitionImageLayout(
 
 	vkCmdPipelineBarrier(transitionCommand, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-	device->EndSingleTimeCommand(transitionCommand, graphicsPool, device->graphicsQueue);
+	EndSingleTimeCommand(transitionCommand, graphicsPool, vulkanContext.graphicsQueue);
 }
 
 void skeleton::Renderer::CopyBufferToImage(
@@ -1316,7 +1226,7 @@ void skeleton::Renderer::CopyBufferToImage(
 	uint32_t _width,
 	uint32_t _height)
 {
-	VkCommandBuffer command = device->BeginSingleTimeCommand(device->transientPool);
+	VkCommandBuffer command = BeginSingleTimeCommand(bufferManager->transientPool);
 
 	VkBufferImageCopy region = {};
 	region.bufferOffset = 0;
@@ -1339,7 +1249,7 @@ void skeleton::Renderer::CopyBufferToImage(
 		1,
 		&region);
 
-	device->EndSingleTimeCommand(command, device->transientPool, device->transferQueue);
+	EndSingleTimeCommand(command, bufferManager->transientPool, vulkanContext.transferQueue);
 }
 
 VkFormat skeleton::Renderer::FindDepthFormat()
@@ -1358,7 +1268,7 @@ VkFormat skeleton::Renderer::FindSupportedFormat(
 	for (VkFormat format : _candidates)
 	{
 		VkFormatProperties properties;
-		vkGetPhysicalDeviceFormatProperties(device->physicalDevice, format, &properties);
+		vkGetPhysicalDeviceFormatProperties(vulkanContext.gpu.device, format, &properties);
 
 		if (_tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & _features) == _features)
 			return format;

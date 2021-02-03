@@ -1,6 +1,11 @@
+\Skeleton\Sandbox\Main.cpp
+	 TODO :--: Line     5 :--: // TODO : Implement shader layout file handling
+	 TODO :--: Line     6 :--: // TODO : Define shader files/directory
 \Skeleton\Skeleton\src\Skeleton\Renderer\BufferManager.h
 	 TODO :--: Line    16 :--: // TODO : Upgrade this to allow more buffers
 \Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.cpp
-	 TODO :--: Line  1152 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
+	 TODO :--: Line  1161 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
 \Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.h
-	 TODO :--: Line    21 :--: // TODO : Move all SDL stuff to its own file
+	 TODO :--: Line    21 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)
+\Skeleton\Skeleton\src\Skeleton\Renderer\RendererBackend.h
+	 TODO :--: Line     7 :--: // TODO : Clean this file up

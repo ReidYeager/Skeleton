@@ -1,4 +1,5 @@
 #pragma once
 
-#include "DebugTools.h"
+#include "Skeleton/Core/DebugTools.h"
+#include "Skeleton/Core/Time.h"
 

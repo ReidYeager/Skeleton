@@ -27,14 +27,17 @@ struct Vertex
 	static std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions()
 	{
 		std::vector<VkVertexInputAttributeDescription> attribs(3);
+		// Position
 		attribs[0].binding = 0;
 		attribs[0].location = 0;
 		attribs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attribs[0].offset = offsetof(Vertex, position);
+		// Color
 		attribs[1].binding = 0;
 		attribs[1].location = 1;
 		attribs[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attribs[1].offset = offsetof(Vertex, color);
+		// UV
 		attribs[2].binding = 0;
 		attribs[2].location = 2;
 		attribs[2].format = VK_FORMAT_R32G32_SFLOAT;

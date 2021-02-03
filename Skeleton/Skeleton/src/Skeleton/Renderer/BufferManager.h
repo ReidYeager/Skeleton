@@ -4,7 +4,7 @@
 
 #include "vulkan/vulkan.h"
 
-#include "Skeleton/Renderer/VulkanDevice.h"
+#include "RendererBackend.h"
 
 namespace skeleton
 {
@@ -20,13 +20,17 @@ private:
 	std::vector<VkBuffer> m_buffers;
 	std::vector<VkDeviceMemory> m_memories;
 
-	VulkanDevice* m_device;
+public:
+	VkCommandPool transientPool;
 
 //=================================================
 // Functions
 //=================================================
 public:
-	BufferManager(VulkanDevice* _device) : m_device(_device) {}
+	BufferManager()
+	{
+		CreateCommandPool(transientPool, vulkanContext.transferIdx);
+	}
 	~BufferManager();
 
 	bool GetIndexBitMapAt(uint32_t _index);

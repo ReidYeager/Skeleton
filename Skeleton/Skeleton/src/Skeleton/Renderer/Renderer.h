@@ -8,8 +8,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-#include "VulkanDevice.h"
 #include "BufferManager.h"
+#include "Skeleton/Core/Camera.h"
 
 namespace skeleton
 {
@@ -18,8 +18,8 @@ class Renderer
 //=================================================
 // Variables
 //=================================================
-private:
-	// TODO : Move all SDL stuff to its own file
+public:
+	// TODO : Find a way to remove SDL window from Create(instance/swapchain)
 	SDL_Window* window;
 
 	VkInstance instance;
@@ -27,7 +27,6 @@ private:
 	std::vector<const char*> validationLayer    = { "VK_LAYER_KHRONOS_validation" };
 	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
 	std::vector<const char*> deviceExtensions   = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-	VulkanDevice* device;
 	BufferManager* bufferManager;
 
 	VkCommandPool graphicsPool;
@@ -52,9 +51,8 @@ private:
 		glm::mat4 view;
 		glm::mat4 proj;
 	} mvp;
+
 	VkDescriptorSetLayout descriptorSetLayout;
-	VkBuffer mvpBuffer;
-	VkDeviceMemory mvpMemory;
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
 
@@ -77,6 +75,12 @@ private:
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexMemory;
 
+	// Move out of renderer
+	//=================================================
+	VkBuffer mvpBuffer;
+	VkDeviceMemory mvpMemory;
+
+	Camera cam;
 
 //=================================================
 // Functions
@@ -86,7 +90,9 @@ public:
 	//=================================================
 
 	// Initializes the renderer in its entirety
-	Renderer();
+	Renderer(
+		const std::vector<const char*>& _extraExtensions,
+		SDL_Window* _window);
 	// Cleans up all vulkan objects
 	~Renderer();
 

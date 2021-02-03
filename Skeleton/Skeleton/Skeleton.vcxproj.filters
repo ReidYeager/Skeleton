@@ -36,16 +36,25 @@
     <ClInclude Include="src\Skeleton.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\AssetLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Skeleton\Core\Vertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\VulkanDevice.h">
+    <ClInclude Include="src\Skeleton\Renderer\BufferManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\BufferManager.h">
+    <ClInclude Include="src\Skeleton\Core\Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Skeleton\Core\Transform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Skeleton\Core\Time.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Skeleton\Core\FileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -59,10 +68,10 @@
     <ClCompile Include="src\Skeleton\Core\Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\VulkanDevice.cpp">
+    <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp">
+    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

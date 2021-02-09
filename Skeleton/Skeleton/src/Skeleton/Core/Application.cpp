@@ -60,6 +60,11 @@ void skeleton::Application::MainLoop()
 	}
 }
 
+void skeleton::Application::DefineShaders()
+{
+	
+}
+
 void skeleton::Application::CoreLoop()
 {
 	SKL_PRINT_SLIM("%f, %f, %6u, %8f FPS", sklTime.totalTime, sklTime.deltaTime, sklTime.frameCount, 1.f/sklTime.deltaTime);

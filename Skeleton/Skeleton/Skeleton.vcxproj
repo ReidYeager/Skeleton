@@ -198,9 +198,10 @@
     <ClInclude Include="src\Skeleton\Core\Transform.h" />
     <ClInclude Include="src\Skeleton\Core\Vertex.h" />
     <ClInclude Include="src\Skeleton\Renderer\BufferManager.h" />
+    <ClInclude Include="src\Skeleton\Renderer\ParProgs.h" />
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
     <ClInclude Include="src\Skeleton.h" />
-    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h" />
+    <ClInclude Include="src\Skeleton\Renderer\RenderBackend.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -211,8 +212,9 @@
     </ClCompile>
     <ClCompile Include="src\Skeleton\Core\Application.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp" />
+    <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp" />
+    <ClCompile Include="src\Skeleton\Renderer\RenderBackend.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

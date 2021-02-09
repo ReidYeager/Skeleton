@@ -11,7 +11,7 @@
 namespace skeleton::tools
 {
 
-inline std::vector<char> LoadFileAsString(
+inline std::vector<char> LoadFile(
 	const char* _directory)
 {
 	std::ifstream inFile;
@@ -32,16 +32,21 @@ inline std::vector<char> LoadFileAsString(
 	return finalString;
 }
 
-//inline void LoadImage(
-//	const char* _directory)
-//{
-//	int width, height, channels;
-//	stbi_uc* img = stbi_load(_directory, &width, &height, &channels, STBI_rgb_alpha);
-//	VkDeviceSize size = width * height * 4;
-//
-//	SKL_PRINT_SLIM("%p", img);
-//	assert(img == nullptr);
-//}
+inline void* LoadImageFile(
+	const char* _directory,
+	int& _width,
+	int& _height)
+{
+	int channels;
+	stbi_uc* img = stbi_load(_directory, &_width, &_height, &channels, STBI_rgb_alpha);
+	assert(img != nullptr);
+	return img;
+}
+
+inline void DestroyImageFile(void* _data)
+{
+	stbi_image_free(_data);
+}
 
 } // namespace skeleton
 

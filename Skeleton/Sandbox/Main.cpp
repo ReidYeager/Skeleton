@@ -12,6 +12,14 @@ public:
 	void Init()
 	{
 		__super::Init();
+
+		renderer->CreateDescriptorSetLayout();
+
+		renderer->CreateRenderer();
+
+		renderer->CreateModelBuffers();
+		renderer->CreateDescriptorSet();
+		renderer->RecordCommandBuffers();
 	}
 
 	void Run()

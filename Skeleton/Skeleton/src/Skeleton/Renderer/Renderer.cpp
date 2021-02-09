@@ -8,10 +8,11 @@
 #include "stb/stb_image.h"
 
 #include "Renderer.h"
-#include "RendererBackend.h"
+#include "RenderBackend.h"
 #include "Skeleton/Core/Common.h"
 #include "Skeleton/Core/FileSystem.h"
 #include "Skeleton/Core/Vertex.h"
+#include "Skeleton/Renderer/ParProgs.h"
 
 const std::vector<skeleton::Vertex> verts = {
 	{{-0.5f,  0.5f, 0.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 0.0f}},
@@ -52,39 +53,12 @@ skeleton::Renderer::Renderer(
 	CreateDevice();
 	bufferManager = new BufferManager();
 	CreateCommandPools();
-
-	CreateDescriptorSetLayout();
-
-	CreateRenderer();
-
-	cam.yaw = -90.f;
-	cam.position.z = 3;
-	cam.UpdateProjection(swapchainExtent.width / float(swapchainExtent.height));
-
-	CreateTextureImage("res/TestImage.png");
-	CreateModelBuffers();
-	CreateDescriptorPool();
-	CreateDescriptorSet();
-	CreateSyncObjects();
-	CreateCommandBuffers();
-	RecordCommandBuffers();
 }
 
 // Cleans up all vulkan objects
 skeleton::Renderer::~Renderer()
 {
 	vkDeviceWaitIdle(vulkanContext.device);
-	vkFreeMemory(vulkanContext.device, textureMemory, nullptr);
-	vkDestroySampler(vulkanContext.device, textureSampler, nullptr);
-	vkDestroyImageView(vulkanContext.device, textureImageView, nullptr);
-	vkDestroyImage(vulkanContext.device, textureImage, nullptr);
-
-	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
-	{
-		vkDestroyFence(vulkanContext.device, flightFences[i], nullptr);
-		vkDestroySemaphore(vulkanContext.device, imageAvailableSemaphores[i], nullptr);
-		vkDestroySemaphore(vulkanContext.device, renderCompleteSemaphores[i], nullptr);
-	}
 
 	vkDestroyDescriptorSetLayout(vulkanContext.device, descriptorSetLayout, nullptr);
 	vkDestroyDescriptorPool(vulkanContext.device, descriptorPool, nullptr);
@@ -94,6 +68,7 @@ skeleton::Renderer::~Renderer()
 	vkDestroyCommandPool(vulkanContext.device, graphicsPool, nullptr);
 
 	delete(bufferManager);
+	vkDestroyDevice(vulkanContext.device, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
@@ -144,6 +119,23 @@ void skeleton::Renderer::RenderFrame()
 	vkQueuePresentKHR(vulkanContext.presentQueue, &presentInfo);
 
 	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
+}
+
+void skeleton::Renderer::LoadShder(
+	const char* _name,
+	VkShaderModule& vertModule,
+	VkShaderModule& fragModule,
+	sklShaderStageFlags _components /*= 3*/)
+{
+	skeleton::CreateShader(_name, SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
+
+	uint32_t vert = skeleton::GetShader(_name, SKL_SHADER_VERT_STAGE);
+	uint32_t frag = skeleton::GetShader(_name, SKL_SHADER_FRAG_STAGE);
+
+	vertModule = vulkanContext.shaders[vert].module;
+	fragModule = vulkanContext.shaders[frag].module;
+
+	// Create descriptorSetLayout
 }
 
 void skeleton::Renderer::CreateDescriptorSetLayout()
@@ -256,11 +248,37 @@ void skeleton::Renderer::CreateRenderer()
 
 	CreateFrameBuffers();
 
+	// Called from Application
+	//CreateDescriptorSetLayout();
+
+	// TODO : Move camera to Application
+	cam.yaw = -90.f;
+	cam.position.z = 3;
+	cam.UpdateProjection(swapchainExtent.width / float(swapchainExtent.height));
+
+	CreateTextureImage("res/TestImage.png");
+	//CreateModelBuffers();
+	CreateDescriptorPool();
+	//CreateDescriptorSet();
+	CreateSyncObjects();
+	CreateCommandBuffers();
 	//RecordCommandBuffers();
 }
 
 void skeleton::Renderer::CleanupRenderer()
 {
+	vkFreeMemory(vulkanContext.device, textureMemory, nullptr);
+	vkDestroySampler(vulkanContext.device, textureSampler, nullptr);
+	vkDestroyImageView(vulkanContext.device, textureImageView, nullptr);
+	vkDestroyImage(vulkanContext.device, textureImage, nullptr);
+
+	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
+	{
+		vkDestroyFence(vulkanContext.device, flightFences[i], nullptr);
+		vkDestroySemaphore(vulkanContext.device, imageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(vulkanContext.device, renderCompleteSemaphores[i], nullptr);
+	}
+
 	for (uint32_t i = 0; i < (uint32_t)frameBuffers.size(); i++)
 	{
 		vkDestroyFramebuffer(vulkanContext.device, frameBuffers[i], nullptr);
@@ -760,8 +778,9 @@ void skeleton::Renderer::CreatePipeline()
 
 	// Shader modules
 	//=================================================
-	VkShaderModule vertModule = CreateShaderModule("default_vert.spv");
-	VkShaderModule fragModule = CreateShaderModule("default_frag.spv");
+	VkShaderModule vertModule; //= CreateShaderModule("default.vspv");
+	VkShaderModule fragModule; //= CreateShaderModule("default.fspv");
+	LoadShder("default", vertModule, fragModule);
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -986,7 +1005,7 @@ VkShaderModule skeleton::Renderer::CreateShaderModule(
 	std::string dir = "res\\Shaders\\";
 	dir.append(_directory);
 
-	std::vector<char> shaderSource = skeleton::tools::LoadFileAsString(dir.c_str());
+	std::vector<char> shaderSource = skeleton::tools::LoadFile(dir.c_str());
 	VkShaderModuleCreateInfo moduleCreateInfo = {};
 	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	moduleCreateInfo.codeSize = shaderSource.size();
@@ -1079,11 +1098,9 @@ void skeleton::Renderer::CreateTextureImage(
 {
 	// Image loading
 	//=================================================
-	int width, height, channels;
-	stbi_uc* img = stbi_load(_directory, &width, &height, &channels, STBI_rgb_alpha);
+	int width, height;
+	void* img = skeleton::tools::LoadImageFile(_directory, width, height);
 	VkDeviceSize size = width * height * 4;
-
-	assert(img != nullptr);
 
 	// Staging buffer
 	//=================================================
@@ -1100,7 +1117,7 @@ void skeleton::Renderer::CreateTextureImage(
 
 	bufferManager->FillBuffer(stagingMemory, img, size);
 
-	stbi_image_free(img);
+	skeleton::tools::DestroyImageFile(img);
 
 	// Image creation
 	//=================================================

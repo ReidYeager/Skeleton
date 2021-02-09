@@ -51,10 +51,13 @@
     <ClInclude Include="src\Skeleton\Core\Time.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h">
+    <ClInclude Include="src\Skeleton\Core\FileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\FileSystem.h">
+    <ClInclude Include="src\Skeleton\Renderer\ParProgs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Skeleton\Renderer\RenderBackend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -71,7 +74,10 @@
     <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp">
+    <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Skeleton\Renderer\RenderBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -2,7 +2,7 @@
 #include "pch.h"
 #include "Skeleton/Core/Common.h"
 #include "BufferManager.h"
-#include "Skeleton/Renderer/RendererBackend.h"
+#include "Skeleton/Renderer/RenderBackend.h"
 
 skeleton::BufferManager::~BufferManager()
 {
@@ -15,6 +15,8 @@ skeleton::BufferManager::~BufferManager()
 			vkDestroyBuffer(vulkanContext.device, m_buffers[i], nullptr);
 		}
 	}
+
+	vkDestroyCommandPool(vulkanContext.device, transientPool, nullptr);
 }
 
 bool skeleton::BufferManager::GetIndexBitMapAt(

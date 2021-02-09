@@ -34,6 +34,7 @@ public:
 
 protected:
 	void MainLoop();
+	void DefineShaders();
 
 private:
 	void CoreLoop();

@@ -4,11 +4,12 @@
 #include "vulkan/vulkan.h"
 
 #include "Skeleton/Core/Common.h"
+#include "Skeleton/Renderer/ParProgs.h"
 
 // TODO : Clean this file up
 
-#ifndef RENDERER_BACKEND_H
-#define RENDERER_BACKEND_H
+#ifndef SKL_RENDER_BACKEND_H
+#define SKL_RENDER_BACKEND_H
 
 struct SklPhysicalDeviceInfo_t
 {
@@ -34,6 +35,9 @@ struct SklVulkanContext_t
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 	VkQueue transferQueue;
+
+	std::vector<skeleton::shader_t> shaders;
+	std::vector<skeleton::parProg_t> parProgs;
 };
 
 extern SklVulkanContext_t vulkanContext;
@@ -141,7 +145,7 @@ inline void CreateLogicalDevice(
 	//CreateCommandPool(transientPool, queueIndices.transfer, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
 }
 
-class RendererBackend
+class RenderBackend
 {
 
 };

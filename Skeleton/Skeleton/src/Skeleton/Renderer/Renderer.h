@@ -96,16 +96,6 @@ public:
 	// Cleans up all vulkan objects
 	~Renderer();
 
-	// Runtime
-	//=================================================
-
-	void RenderFrame();
-
-	void CreateDescriptorSetLayout();
-	void CreateDescriptorPool();
-	void CreateDescriptorSet();
-
-protected:
 	// Create Renderer
 	//=================================================
 
@@ -113,6 +103,25 @@ protected:
 	void CleanupRenderer();
 	void RecreateRenderer();
 
+	// Runtime
+	//=================================================
+
+	void RenderFrame();
+
+	void LoadShder(
+		const char* _name,
+		VkShaderModule& vertModule,
+		VkShaderModule& fragModule,
+		sklShaderStageFlags _components = 0x3);
+
+	void CreateDescriptorSetLayout();
+	void CreateDescriptorPool();
+	void CreateDescriptorSet();
+
+	void CreateModelBuffers();
+	void RecordCommandBuffers();
+
+protected:
 	// Initializers
 	//=================================================
 
@@ -145,8 +154,6 @@ protected:
 	void CreateDepthImage();
 	void CreateFrameBuffers();
 
-	void RecordCommandBuffers();
-
 	// Helpers
 	//=================================================
 
@@ -168,8 +175,6 @@ protected:
 
 	VkShaderModule CreateShaderModule(
 		const char* _directory);
-
-	void CreateModelBuffers();
 
 	void CreateImage(
 		uint32_t _width,

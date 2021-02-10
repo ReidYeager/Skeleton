@@ -32,7 +32,6 @@ public:
 	VkCommandPool graphicsPool;
 
 	VkFormat swapchainFormat;
-	VkExtent2D swapchainExtent;
 	VkSwapchainKHR swapchain;
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
@@ -41,6 +40,11 @@ public:
 	VkDeviceMemory textureMemory;
 	VkImageView textureImageView;
 	VkSampler textureSampler;
+
+	VkImage alttextureImage;
+	VkDeviceMemory alttextureMemory;
+	VkImageView alttextureImageView;
+	VkSampler alttextureSampler;
 
 	VkImage depthImage;
 	VkDeviceMemory depthMemory;
@@ -108,13 +112,6 @@ public:
 
 	void RenderFrame();
 
-	void LoadShder(
-		const char* _name,
-		VkShaderModule& vertModule,
-		VkShaderModule& fragModule,
-		sklShaderStageFlags _components = 0x3);
-
-	void CreateDescriptorSetLayout();
 	void CreateDescriptorPool();
 	void CreateDescriptorSet();
 
@@ -173,9 +170,6 @@ protected:
 		VkImageAspectFlags _aspect,
 		const VkImage& _image);
 
-	VkShaderModule CreateShaderModule(
-		const char* _directory);
-
 	void CreateImage(
 		uint32_t _width,
 		uint32_t _height,
@@ -187,9 +181,13 @@ protected:
 		VkDeviceMemory& _memory);
 
 	void CreateTextureImage(
-		const char* _directory);
+		const char* _directory,
+		VkImage& _image,
+		VkImageView& _view,
+		VkDeviceMemory& _memory,
+		VkSampler& _sampler);
 
-	void CreateSampler();
+	VkSampler CreateSampler();
 
 	void TransitionImageLayout(
 		VkImage _iamge,

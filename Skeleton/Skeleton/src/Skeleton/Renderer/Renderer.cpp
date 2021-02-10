@@ -34,9 +34,9 @@ const std::vector<uint32_t> indices = {
 	4, 7, 6
 };
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // Initialize & Cleanup
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 // Initializes the renderer in its entirety
 skeleton::Renderer::Renderer(
@@ -73,9 +73,9 @@ skeleton::Renderer::~Renderer()
 	vkDestroyInstance(instance, nullptr);
 }
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // RenderFrame
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 void skeleton::Renderer::RenderFrame()
 {
@@ -121,49 +121,6 @@ void skeleton::Renderer::RenderFrame()
 	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
 }
 
-void skeleton::Renderer::LoadShder(
-	const char* _name,
-	VkShaderModule& vertModule,
-	VkShaderModule& fragModule,
-	sklShaderStageFlags _components /*= 3*/)
-{
-	skeleton::CreateShader(_name, SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
-
-	uint32_t vert = skeleton::GetShader(_name, SKL_SHADER_VERT_STAGE);
-	uint32_t frag = skeleton::GetShader(_name, SKL_SHADER_FRAG_STAGE);
-
-	vertModule = vulkanContext.shaders[vert].module;
-	fragModule = vulkanContext.shaders[frag].module;
-
-	// Create descriptorSetLayout
-}
-
-void skeleton::Renderer::CreateDescriptorSetLayout()
-{
-	VkDescriptorSetLayoutBinding mvpBufferBinding = {};
-	mvpBufferBinding.binding = 0;
-	mvpBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	mvpBufferBinding.descriptorCount = 1;
-	mvpBufferBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	mvpBufferBinding.pImmutableSamplers = nullptr;
-	VkDescriptorSetLayoutBinding textureBinding = {};
-	textureBinding.binding = 1;
-	textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	textureBinding.descriptorCount = 1;
-	textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	textureBinding.pImmutableSamplers = nullptr;
-
-	VkDescriptorSetLayoutBinding bindings[] = {mvpBufferBinding, textureBinding};
-	VkDescriptorSetLayoutCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-	createInfo.bindingCount = 2;
-	createInfo.pBindings = bindings;
-
-	SKL_ASSERT_VK(
-		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &descriptorSetLayout),
-		"Failed to create descriptor set layout");
-}
-
 void skeleton::Renderer::CreateDescriptorPool()
 {
 	VkDescriptorPoolSize poolSizes[2] = {};
@@ -183,6 +140,7 @@ void skeleton::Renderer::CreateDescriptorPool()
 		"Failed to create descriptor pool");
 }
 
+// TODO : Make this dynamic alongside DescriptorLayout.
 void skeleton::Renderer::CreateDescriptorSet()
 {
 	VkDescriptorSetAllocateInfo allocInfo = {};
@@ -207,7 +165,13 @@ void skeleton::Renderer::CreateDescriptorSet()
 	imageInfo.sampler = textureSampler;
 	imageInfo.imageView = textureImageView;
 
-	VkWriteDescriptorSet descWrites[2] = {};
+	// Texture sampler
+	VkDescriptorImageInfo altImageInfo = {};
+	altImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	altImageInfo.sampler = alttextureSampler;
+	altImageInfo.imageView = alttextureImageView;
+
+	VkWriteDescriptorSet descWrites[3] = {};
 	descWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descWrites[0].dstSet = descriptorSet;
 	descWrites[0].dstBinding = 0;
@@ -228,13 +192,22 @@ void skeleton::Renderer::CreateDescriptorSet()
 	descWrites[1].pImageInfo = &imageInfo;
 	descWrites[1].pTexelBufferView = nullptr;
 
-	vkUpdateDescriptorSets(vulkanContext.device, 2, descWrites, 0, nullptr);
+	descWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descWrites[2].dstSet = descriptorSet;
+	descWrites[2].dstBinding = 2;
+	descWrites[2].dstArrayElement = 0;
+	descWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descWrites[2].descriptorCount = 1;
+	descWrites[2].pBufferInfo = nullptr;
+	descWrites[2].pImageInfo = &altImageInfo;
+	descWrites[2].pTexelBufferView = nullptr;
 
+	vkUpdateDescriptorSets(vulkanContext.device, 3, descWrites, 0, nullptr);
 }
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // CreateRenderer
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 void skeleton::Renderer::CreateRenderer()
 {
@@ -248,15 +221,24 @@ void skeleton::Renderer::CreateRenderer()
 
 	CreateFrameBuffers();
 
-	// Called from Application
-	//CreateDescriptorSetLayout();
-
 	// TODO : Move camera to Application
 	cam.yaw = -90.f;
 	cam.position.z = 3;
-	cam.UpdateProjection(swapchainExtent.width / float(swapchainExtent.height));
+	cam.UpdateProjection(vulkanContext.renderExtent.width / float(vulkanContext.renderExtent.height));
 
-	CreateTextureImage("res/TestImage.png");
+	CreateTextureImage(
+		"res/TestImage.png",
+		textureImage,
+		textureImageView,
+		textureMemory,
+		textureSampler);
+
+	CreateTextureImage(
+		"res/AltImage.png",
+		alttextureImage,
+		alttextureImageView,
+		alttextureMemory,
+		alttextureSampler);
 	//CreateModelBuffers();
 	CreateDescriptorPool();
 	//CreateDescriptorSet();
@@ -271,6 +253,11 @@ void skeleton::Renderer::CleanupRenderer()
 	vkDestroySampler(vulkanContext.device, textureSampler, nullptr);
 	vkDestroyImageView(vulkanContext.device, textureImageView, nullptr);
 	vkDestroyImage(vulkanContext.device, textureImage, nullptr);
+
+	vkFreeMemory(vulkanContext.device, alttextureMemory, nullptr);
+	vkDestroySampler(vulkanContext.device, alttextureSampler, nullptr);
+	vkDestroyImageView(vulkanContext.device, alttextureImageView, nullptr);
+	vkDestroyImage(vulkanContext.device, alttextureImage, nullptr);
 
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
@@ -307,9 +294,9 @@ void skeleton::Renderer::RecreateRenderer()
 	CreateRenderer();
 }
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // Initialization
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 // Creates the vkInstance & vkSurface
 void skeleton::Renderer::CreateInstance()
@@ -502,9 +489,9 @@ void skeleton::Renderer::CreateCommandBuffers()
 		"Failed to allocate command buffers");
 }
 
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 // CreateRenderer Functions
-//////////////////////////////////////////////////////////////////////////
+//=================================================
 
 void skeleton::Renderer::CreateSwapchain()
 {
@@ -597,7 +584,7 @@ void skeleton::Renderer::CreateSwapchain()
 		"Failed to create swapchain");
 
 	swapchainFormat = formatInfo.format;
-	swapchainExtent = extent;
+	vulkanContext.renderExtent = extent;
 
 	vkGetSwapchainImagesKHR(vulkanContext.device, swapchain, &imageCount, nullptr);
 	swapchainImages.resize(imageCount);
@@ -686,149 +673,15 @@ void skeleton::Renderer::CreatePipelineLayout()
 
 void skeleton::Renderer::CreatePipeline()
 {
-	// Viewport State
-	//=================================================
-	VkViewport viewport;
-	viewport.x = 0;
-	viewport.y = 0;
-	viewport.width = (float)swapchainExtent.width;
-	viewport.height = (float)swapchainExtent.height;
-	viewport.minDepth = 0;
-	viewport.maxDepth = 1;
-
-	VkRect2D scissor = {};
-	scissor.extent = swapchainExtent;
-	scissor.offset = { 0, 0 };
-
-	VkPipelineViewportStateCreateInfo viewportStateInfo = {};
-	viewportStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportStateInfo.scissorCount = 1;
-	viewportStateInfo.pScissors = &scissor;
-	viewportStateInfo.viewportCount = 1;
-	viewportStateInfo.pViewports = &viewport;
-
-	// Vert Input State
-	//=================================================
-	const auto vertexInputBindingDesc = skeleton::Vertex::GetBindingDescription();
-	const auto vertexInputAttribDescs = skeleton::Vertex::GetAttributeDescriptions();
-
-	VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {};
-	vertexInputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputStateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttribDescs.size());
-	vertexInputStateInfo.pVertexAttributeDescriptions = vertexInputAttribDescs.data();
-	vertexInputStateInfo.vertexBindingDescriptionCount = 1;
-	vertexInputStateInfo.pVertexBindingDescriptions = &vertexInputBindingDesc;
-
-	// Input Assembly
-	//=================================================
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo = {};
-	inputAssemblyStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssemblyStateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssemblyStateInfo.primitiveRestartEnable = VK_FALSE;
-
-	// Rasterizer
-	//=================================================
-	VkPipelineRasterizationStateCreateInfo rasterStateInfo = {};
-	rasterStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	//rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterStateInfo.cullMode = VK_CULL_MODE_NONE;
-	rasterStateInfo.rasterizerDiscardEnable = VK_TRUE;
-	rasterStateInfo.lineWidth = 1.f;
-	rasterStateInfo.depthBiasEnable = VK_FALSE;
-	rasterStateInfo.depthClampEnable = VK_FALSE;
-	rasterStateInfo.rasterizerDiscardEnable = VK_FALSE;
-
-	// Multisample State
-	//=================================================
-	VkPipelineMultisampleStateCreateInfo multisampleStateInfo = {};
-	multisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisampleStateInfo.sampleShadingEnable = VK_FALSE;
-
-	// Depth State
-	//=================================================
-	VkPipelineDepthStencilStateCreateInfo depthStateInfo = {};
-	depthStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStateInfo.depthTestEnable = VK_TRUE;
-	depthStateInfo.depthWriteEnable = VK_TRUE;
-	depthStateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
-	depthStateInfo.back.compareOp = VK_COMPARE_OP_ALWAYS;
-	depthStateInfo.depthBoundsTestEnable = VK_FALSE;
-
-	// Color Blend State
-	//=================================================
-	VkPipelineColorBlendAttachmentState blendAttachmentState = {};
-	blendAttachmentState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	blendAttachmentState.blendEnable = VK_FALSE;
-
-	VkPipelineColorBlendStateCreateInfo blendStateInfo = {};
-	blendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	blendStateInfo.logicOpEnable = VK_FALSE;
-	blendStateInfo.attachmentCount = 1;
-	blendStateInfo.pAttachments = &blendAttachmentState;
-
-	// Dynamic states
-	//=================================================
-	VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
-	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicStateInfo.dynamicStateCount = 0;
-	dynamicStateInfo.pDynamicStates = nullptr;
-
-	// Shader modules
-	//=================================================
-	VkShaderModule vertModule; //= CreateShaderModule("default.vspv");
-	VkShaderModule fragModule; //= CreateShaderModule("default.fspv");
-	LoadShder("default", vertModule, fragModule);
-
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertModule;
-	vertShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragModule;
-	fragShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
-	// Pipeline
-	//=================================================
-	VkGraphicsPipelineCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	createInfo.pViewportState = &viewportStateInfo;
-	createInfo.pVertexInputState = &vertexInputStateInfo;
-	createInfo.pInputAssemblyState = &inputAssemblyStateInfo;
-	createInfo.pRasterizationState = &rasterStateInfo;
-	createInfo.pMultisampleState = &multisampleStateInfo;
-	createInfo.pDepthStencilState = &depthStateInfo;
-	createInfo.pColorBlendState = &blendStateInfo;
-	createInfo.pDynamicState = &dynamicStateInfo;
-
-	createInfo.stageCount = 2;
-	createInfo.pStages = shaderStages;
-
-	createInfo.layout = pipelineLayout;
-	createInfo.renderPass = renderpass;
-
-	SKL_ASSERT_VK(
-		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &pipeline),
-		"Failed to create graphics pipeline");
-
-	vkDestroyShaderModule(vulkanContext.device, vertModule, nullptr);
-	vkDestroyShaderModule(vulkanContext.device, fragModule, nullptr);
+	pipeline = vulkanContext.parProgs[0].GetPipeline(pipelineLayout, renderpass);
 }
 
 void skeleton::Renderer::CreateDepthImage()
 {
 	VkFormat depthFormat = FindDepthFormat();
 	CreateImage(
-		swapchainExtent.width,
-		swapchainExtent.height,
+		vulkanContext.renderExtent.width,
+		vulkanContext.renderExtent.height,
 		depthFormat,
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -845,8 +698,8 @@ void skeleton::Renderer::CreateFrameBuffers()
 	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	createInfo.renderPass = renderpass;
 	createInfo.layers = 1;
-	createInfo.width = swapchainExtent.width;
-	createInfo.height = swapchainExtent.height;
+	createInfo.width = vulkanContext.renderExtent.width;
+	createInfo.height = vulkanContext.renderExtent.height;
 
 	uint32_t imageCount = static_cast<uint32_t>(swapchainImageViews.size());
 	frameBuffers.resize(imageCount);
@@ -878,7 +731,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 	rpBeginInfo.renderPass = renderpass;
 	rpBeginInfo.clearValueCount = 2;
 	rpBeginInfo.pClearValues = clearValues;
-	rpBeginInfo.renderArea.extent = swapchainExtent;
+	rpBeginInfo.renderArea.extent = vulkanContext.renderExtent;
 	rpBeginInfo.renderArea.offset = {0, 0};
 
 	for (uint32_t i = 0; i < comandCount; i++)
@@ -999,25 +852,6 @@ VkImageView skeleton::Renderer::CreateImageView(
 	return tmpView;
 }
 
-VkShaderModule skeleton::Renderer::CreateShaderModule(
-	const char* _directory)
-{
-	std::string dir = "res\\Shaders\\";
-	dir.append(_directory);
-
-	std::vector<char> shaderSource = skeleton::tools::LoadFile(dir.c_str());
-	VkShaderModuleCreateInfo moduleCreateInfo = {};
-	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	moduleCreateInfo.codeSize = shaderSource.size();
-	moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(shaderSource.data());
-	VkShaderModule tmpModule;
-	SKL_ASSERT_VK(
-		vkCreateShaderModule(vulkanContext.device, &moduleCreateInfo, nullptr, &tmpModule),
-		"Failed to create shader module");
-
-	return tmpModule;
-}
-
 void skeleton::Renderer::CreateModelBuffers()
 {
 	// Create vertex buffer
@@ -1094,7 +928,11 @@ void skeleton::Renderer::CreateImage(
 }
 
 void skeleton::Renderer::CreateTextureImage(
-	const char* _directory)
+	const char* _directory,
+	VkImage& _image,
+	VkImageView& _view,
+	VkDeviceMemory& _memory,
+	VkSampler& _sampler)
 {
 	// Image loading
 	//=================================================
@@ -1129,33 +967,33 @@ void skeleton::Renderer::CreateTextureImage(
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		textureImage,
-		textureMemory);
+		_image,
+		_memory);
 
 	TransitionImageLayout(
-		textureImage,
+		_image,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	CopyBufferToImage(
 		stagingBuffer,
-		textureImage,
+		_image,
 		static_cast<uint32_t>(width),
 		static_cast<uint32_t>(height));
 	TransitionImageLayout(
-		textureImage,
+		_image,
 		VK_FORMAT_R8G8B8A8_UNORM,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	bufferManager->RemoveAtIndex(stagingIndex);
 
-	textureImageView = CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureImage);
+	_view = CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, _image);
 
-	CreateSampler();
+	_sampler = CreateSampler();
 }
 
-void skeleton::Renderer::CreateSampler()
+VkSampler skeleton::Renderer::CreateSampler()
 {
 	VkSamplerCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1181,9 +1019,12 @@ void skeleton::Renderer::CreateSampler()
 	createInfo.anisotropyEnable = VK_TRUE;
 	createInfo.maxAnisotropy = physicalProps.limits.maxSamplerAnisotropy;
 
+	VkSampler tmpSampler;
 	SKL_ASSERT_VK(
-		vkCreateSampler(vulkanContext.device, &createInfo, nullptr, &textureSampler),
+		vkCreateSampler(vulkanContext.device, &createInfo, nullptr, &tmpSampler),
 		"Failed to create texture sampler");
+
+	return tmpSampler;
 }
 
 void skeleton::Renderer::TransitionImageLayout(

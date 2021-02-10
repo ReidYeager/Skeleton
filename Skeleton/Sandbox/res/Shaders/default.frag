@@ -2,6 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(binding = 1) uniform sampler2D tex;
+layout(binding = 2) uniform sampler2D alt;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 uv;
@@ -9,7 +10,9 @@ layout(location = 1) in vec2 uv;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    outColor = texture(tex, uv);
-//    outColor = vec4(uv, 0.0, 1.0);
+	vec4 A = texture(tex, uv);
+	vec4 B = texture(alt, uv);
+	float x = round(uv.x);
+	outColor = (A * x) + (B * (1 - x));
 }
 

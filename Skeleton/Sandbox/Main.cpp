@@ -13,7 +13,9 @@ public:
 	{
 		__super::Init();
 
-		renderer->CreateDescriptorSetLayout();
+		skeleton::CreateShader("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
+
+		renderer->descriptorSetLayout = vulkanContext.parProgs[0].descriptorSetLayout;
 
 		renderer->CreateRenderer();
 

@@ -6,20 +6,27 @@
 #ifndef PARPROGS_H
 #define PARPROGS_H
 
-//#include <string>
+#include <vector>
 #include "vulkan/vulkan.h"
+
+typedef uint32_t sklFlags;
+typedef sklFlags sklShaderStageFlags;
+typedef sklFlags sklShaderBindingFlags;
+typedef enum sklShaderStageFlagBits
+{
+	SKL_SHADER_VERT_STAGE = 0x1,
+	SKL_SHADER_FRAG_STAGE = 0x2,
+	SKL_SHADER_COMP_STAGE = 0x4
+}sklShaderStageFlagBits;
+typedef enum sklShaderBindingFlagBits
+{
+	SKL_BINDING_BUFFER,
+	SKL_BINDING_SAMPLER,
+	SKL_BINDING_MAX_COUNT
+}sklShaderBindingFlagBits;
 
 namespace skeleton
 {
-typedef uint32_t sklFlags;
-typedef sklFlags sklShaderStageFlags;
-typedef enum sklShaderStageFlagBits
-{
-	SKL_SHADER_VERT_STAGE	= 0x1,
-	SKL_SHADER_FRAG_STAGE	= 0x2,
-	SKL_SHADER_COMP_STAGE	= 0x4
-}sklShaderStageFlagBits;
-
 struct shader_t
 {
 	shader_t(const char* _name) :
@@ -31,7 +38,7 @@ struct shader_t
 	sklShaderStageFlags stage;
 	VkShaderModule module;
 	// buffer components
-	// buffer/sampler/pushConstant layout
+	std::vector<sklShaderBindingFlags> bindings;
 };
 
 // Parallel Program
@@ -43,12 +50,15 @@ struct parProg_t
 		fragIdx(-1),
 		compIdx(-1) {}
 
-	VkPipeline GetPipeline();
+	VkPipeline GetPipeline(
+		VkPipelineLayout _layout,
+		VkRenderPass _renderpass);
 
 	const char* name;
 	uint32_t vertIdx;
 	uint32_t fragIdx;
 	uint32_t compIdx;
+	VkDescriptorSetLayout descriptorSetLayout;
 };
 
 void CreateShader(
@@ -60,7 +70,13 @@ uint32_t GetShader(const char* _name, sklShaderStageFlags _stage);
 void LoadShader(uint32_t _index);
 void LoadShader(shader_t& _shader);
 
-
+void CreateDescriptorSetLayout(
+	parProg_t& _program);
+void CreateDescriptorSetLayout(
+	VkDescriptorSetLayout& _layout,
+	uint32_t _vertIdx = -1,
+	uint32_t _fragIdx = -1,
+	uint32_t _compIdx = -1);
 
 } // namespace skeleton
 #endif // !PARPROGS_H

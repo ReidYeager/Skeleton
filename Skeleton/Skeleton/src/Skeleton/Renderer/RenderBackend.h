@@ -38,6 +38,8 @@ struct SklVulkanContext_t
 
 	std::vector<skeleton::shader_t> shaders;
 	std::vector<skeleton::parProg_t> parProgs;
+
+	VkExtent2D renderExtent;
 };
 
 extern SklVulkanContext_t vulkanContext;

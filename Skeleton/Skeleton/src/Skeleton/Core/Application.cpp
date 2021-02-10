@@ -79,6 +79,16 @@ void skeleton::Application::CoreLoop()
 	sklTime.totalTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
 	sklTime.deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - prevTime).count();
 
+	// FPS cap
+	uint32_t FPSCap = 300;
+	while (sklTime.deltaTime < (1.f/FPSCap))
+	{
+		curTime = std::chrono::high_resolution_clock::now();
+		sklTime.totalTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - startTime).count();
+		sklTime.deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - prevTime).count();
+	}
+
+
 	while (SDL_PollEvent(&e) != 0)
 	{
 		//if (e.type == SDL_WINDOWEVENT)

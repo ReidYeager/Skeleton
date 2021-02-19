@@ -60,9 +60,7 @@ public:
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
 
-	VkRenderPass renderpass;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
+	uint32_t m_boundParProg = 0;
 
 	std::vector<VkFramebuffer> frameBuffers;
 	std::vector<VkCommandBuffer> commandBuffers;
@@ -113,7 +111,7 @@ public:
 	void RenderFrame();
 
 	void CreateDescriptorPool();
-	void CreateDescriptorSet();
+	void CreateDescriptorSet(parProg_t& _prog);
 
 	void CreateModelBuffers();
 	void RecordCommandBuffers();
@@ -146,8 +144,6 @@ protected:
 
 	void CreateSwapchain();
 	void CreateRenderpass();
-	void CreatePipelineLayout();
-	void CreatePipeline();
 	void CreateDepthImage();
 	void CreateFrameBuffers();
 

@@ -7,10 +7,13 @@
 
 #include <string>
 
-VkPipeline skeleton::parProg_t::GetPipeline(
-	VkPipelineLayout _layout,
-	VkRenderPass _renderpass)
+VkPipeline skeleton::parProg_t::GetPipeline()
 {
+	if (pipeline != VK_NULL_HANDLE)
+	{
+		return pipeline;
+	}
+
 	// Viewport State
 	//=================================================
 	VkViewport viewport;
@@ -136,18 +139,17 @@ VkPipeline skeleton::parProg_t::GetPipeline(
 	createInfo.stageCount = 2;
 	createInfo.pStages = shaderStages;
 
-	createInfo.layout = _layout;
-	createInfo.renderPass = _renderpass;
+	createInfo.layout = pipelineLayout;
+	createInfo.renderPass = vulkanContext.renderPass;
 
-	VkPipeline tmpPipeline = VK_NULL_HANDLE;
 	SKL_ASSERT_VK(
-		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &tmpPipeline),
+		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &pipeline),
 		"Failed to create graphics pipeline");
 
 	vkDestroyShaderModule(vulkanContext.device, vertModule, nullptr);
 	vkDestroyShaderModule(vulkanContext.device, fragModule, nullptr);
 
-	return tmpPipeline;
+	return pipeline;
 }
 
 void skeleton::CreateShader(
@@ -265,15 +267,6 @@ void skeleton::LoadShader(shader_t& _shader)
 
 void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 {
-	CreateDescriptorSetLayout(_program.descriptorSetLayout, _program.vertIdx, _program.fragIdx);
-}
-
-void skeleton::CreateDescriptorSetLayout(
-	VkDescriptorSetLayout& _layout,
-	uint32_t _vertIdx /*= -1*/,
-	uint32_t _fragIdx /*= -1*/,
-	uint32_t _compIdx /*= -1*/)
-{
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
 	VkDescriptorSetLayoutBinding binding = {};
 	binding.descriptorCount = 1;
@@ -282,9 +275,9 @@ void skeleton::CreateDescriptorSetLayout(
 	uint32_t bindingIndex = 0;
 
 	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	if (_vertIdx != -1)
+	if (_program.vertIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_vertIdx];
+		skeleton::shader_t& shader = vulkanContext.shaders[_program.vertIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -297,13 +290,14 @@ void skeleton::CreateDescriptorSetLayout(
 			}
 			binding.binding = bindingIndex++;
 			bindings.push_back(binding);
+			_program.bindings.push_back(shader.bindings[i]);
 		}
 	}
 
 	binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-	if (_fragIdx != -1)
+	if (_program.fragIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_fragIdx];
+		skeleton::shader_t& shader = vulkanContext.shaders[_program.fragIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -316,13 +310,14 @@ void skeleton::CreateDescriptorSetLayout(
 			}
 			binding.binding = bindingIndex++;
 			bindings.push_back(binding);
+			_program.bindings.push_back(shader.bindings[i]);
 		}
 	}
 
 	binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-	if (_compIdx != -1)
+	if (_program.compIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_compIdx];
+		skeleton::shader_t& shader = vulkanContext.shaders[_program.compIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -335,6 +330,7 @@ void skeleton::CreateDescriptorSetLayout(
 			}
 			binding.binding = bindingIndex++;
 			bindings.push_back(binding);
+			_program.bindings.push_back(shader.bindings[i]);
 		}
 	}
 
@@ -344,8 +340,31 @@ void skeleton::CreateDescriptorSetLayout(
 	createInfo.pBindings = bindings.data();
 
 	SKL_ASSERT_VK(
-		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &_layout),
+		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &_program.descriptorSetLayout),
 		"Failed to create descriptor set layout");
 
+	//Pipeline Layout/////////////////////////////////////////////////////////
+	VkPipelineLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	layoutInfo.setLayoutCount = 1;
+	layoutInfo.pSetLayouts = &_program.descriptorSetLayout;
+	layoutInfo.pushConstantRangeCount = 0;
+	layoutInfo.pPushConstantRanges = nullptr;
+
+	SKL_ASSERT_VK(
+		vkCreatePipelineLayout(vulkanContext.device, &layoutInfo, nullptr, &_program.pipelineLayout),
+		"Failed to create pipeline layout");
+}
+
+size_t skeleton::PadBufferDataForShader(
+	size_t _original)
+{
+	size_t alignment = vulkanContext.gpu.properties.limits.minUniformBufferOffsetAlignment;
+	size_t alignedSize = _original;
+	if (alignment > 0)
+	{
+		alignedSize = (alignedSize + alignment - 1) & ~(alignment - 1);
+	}
+	return alignedSize;
 }
 

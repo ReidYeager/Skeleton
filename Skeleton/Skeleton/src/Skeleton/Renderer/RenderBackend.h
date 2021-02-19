@@ -40,6 +40,7 @@ struct SklVulkanContext_t
 	std::vector<skeleton::parProg_t> parProgs;
 
 	VkExtent2D renderExtent;
+	VkRenderPass renderPass;
 };
 
 extern SklVulkanContext_t vulkanContext;

@@ -188,6 +188,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="framework.h" />
+    <ClInclude Include="Renderable.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="src\Skeleton\Core\Application.h" />
     <ClInclude Include="src\Skeleton\Core\FileSystem.h" />
@@ -198,12 +199,14 @@
     <ClInclude Include="src\Skeleton\Core\Transform.h" />
     <ClInclude Include="src\Skeleton\Core\Vertex.h" />
     <ClInclude Include="src\Skeleton\Renderer\BufferManager.h" />
+    <ClInclude Include="src\Skeleton\Renderer\Image.h" />
     <ClInclude Include="src\Skeleton\Renderer\ParProgs.h" />
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
     <ClInclude Include="src\Skeleton.h" />
     <ClInclude Include="src\Skeleton\Renderer\RenderBackend.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Renderable.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

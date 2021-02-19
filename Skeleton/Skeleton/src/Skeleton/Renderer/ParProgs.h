@@ -48,17 +48,20 @@ struct parProg_t
 		name(_name),
 		vertIdx(-1),
 		fragIdx(-1),
-		compIdx(-1) {}
+		compIdx(-1),
+		pipeline(VK_NULL_HANDLE) {}
 
-	VkPipeline GetPipeline(
-		VkPipelineLayout _layout,
-		VkRenderPass _renderpass);
+	VkPipeline GetPipeline();
 
 	const char* name;
 	uint32_t vertIdx;
 	uint32_t fragIdx;
 	uint32_t compIdx;
+
+	std::vector<sklShaderBindingFlags> bindings;
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkPipelineLayout pipelineLayout;
+	VkPipeline pipeline;
 };
 
 void CreateShader(
@@ -72,11 +75,9 @@ void LoadShader(shader_t& _shader);
 
 void CreateDescriptorSetLayout(
 	parProg_t& _program);
-void CreateDescriptorSetLayout(
-	VkDescriptorSetLayout& _layout,
-	uint32_t _vertIdx = -1,
-	uint32_t _fragIdx = -1,
-	uint32_t _compIdx = -1);
+
+size_t PadBufferDataForShader(
+	size_t _original);
 
 } // namespace skeleton
 #endif // !PARPROGS_H

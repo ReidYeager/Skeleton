@@ -127,7 +127,7 @@ void skeleton::Renderer::CreateDescriptorPool()
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	poolSizes[0].descriptorCount = 1;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 1;
+	poolSizes[1].descriptorCount = 2;
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -141,13 +141,13 @@ void skeleton::Renderer::CreateDescriptorPool()
 }
 
 // TODO : Make this dynamic alongside DescriptorLayout.
-void skeleton::Renderer::CreateDescriptorSet()
+void skeleton::Renderer::CreateDescriptorSet(parProg_t& _prog)
 {
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = descriptorPool;
 	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = &descriptorSetLayout;
+	allocInfo.pSetLayouts = &_prog.descriptorSetLayout;
 
 	SKL_ASSERT_VK(
 		vkAllocateDescriptorSets(vulkanContext.device, &allocInfo, &descriptorSet),
@@ -203,6 +203,9 @@ void skeleton::Renderer::CreateDescriptorSet()
 	descWrites[2].pTexelBufferView = nullptr;
 
 	vkUpdateDescriptorSets(vulkanContext.device, 3, descWrites, 0, nullptr);
+
+	//vkCmdBindPipeline(_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _prog.GetPipeline());
+	//vkCmdBindDescriptorSets(_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _prog.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 }
 
 //=================================================
@@ -215,9 +218,6 @@ void skeleton::Renderer::CreateRenderer()
 	CreateRenderpass();
 
 	CreateDepthImage();
-
-	CreatePipelineLayout();
-	CreatePipeline();
 
 	CreateFrameBuffers();
 
@@ -241,7 +241,7 @@ void skeleton::Renderer::CreateRenderer()
 		alttextureSampler);
 	//CreateModelBuffers();
 	CreateDescriptorPool();
-	//CreateDescriptorSet();
+	//CreateDescriptorSet(vulkanContext.parProgs[0]);
 	CreateSyncObjects();
 	CreateCommandBuffers();
 	//RecordCommandBuffers();
@@ -275,9 +275,13 @@ void skeleton::Renderer::CleanupRenderer()
 	vkFreeMemory(vulkanContext.device, depthMemory, nullptr);
 	vkDestroyImageView(vulkanContext.device, depthImageView, nullptr);
 
-	vkDestroyPipeline(vulkanContext.device, pipeline, nullptr);
-	vkDestroyPipelineLayout(vulkanContext.device, pipelineLayout, nullptr);
-	vkDestroyRenderPass(vulkanContext.device, renderpass, nullptr);
+	for (uint32_t i = 0; i < vulkanContext.parProgs.size(); i++)
+	{
+		parProg_t& shader = vulkanContext.parProgs[i];
+		vkDestroyPipeline(vulkanContext.device, shader.GetPipeline(), nullptr);
+		vkDestroyPipelineLayout(vulkanContext.device, shader.pipelineLayout, nullptr);
+	}
+	vkDestroyRenderPass(vulkanContext.device, vulkanContext.renderPass, nullptr);
 
 	for (const auto& view : swapchainImageViews)
 	{
@@ -353,6 +357,36 @@ void skeleton::Renderer::CreateDevice()
 		deviceExtensions,
 		validationLayer);
 
+	// Fill GPU details
+	VkPhysicalDevice& pysDevice = vulkanContext.gpu.device;
+	SklPhysicalDeviceInfo_t& pdInfo = vulkanContext.gpu;
+
+	uint32_t propertyCount;
+	vkGetPhysicalDeviceQueueFamilyProperties(pysDevice, &propertyCount, nullptr);
+	pdInfo.queueFamilyProperties.resize(propertyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(pysDevice, &propertyCount, pdInfo.queueFamilyProperties.data());
+
+	vkGetPhysicalDeviceProperties(pysDevice, &pdInfo.properties);
+
+	uint32_t extensionCount;
+	vkEnumerateDeviceExtensionProperties(pysDevice, nullptr, &extensionCount, nullptr);
+	pdInfo.extensionProperties.resize(extensionCount);
+	vkEnumerateDeviceExtensionProperties(pysDevice, nullptr, &extensionCount, pdInfo.extensionProperties.data());
+
+	vkGetPhysicalDeviceFeatures(pysDevice, &pdInfo.features);
+	vkGetPhysicalDeviceMemoryProperties(pysDevice, &pdInfo.memProperties);
+
+	uint32_t presentModeCount;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(pysDevice, surface, &presentModeCount, nullptr);
+	pdInfo.presentModes.resize(presentModeCount);
+	vkGetPhysicalDeviceSurfacePresentModesKHR(pysDevice, surface, &presentModeCount, pdInfo.presentModes.data());
+
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pysDevice, surface, &pdInfo.surfaceCapabilities);
+
+	uint32_t surfaceFormatCount;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(pysDevice, surface, &surfaceFormatCount, nullptr);
+	pdInfo.surfaceFormats.resize(surfaceFormatCount);
+	vkGetPhysicalDeviceSurfaceFormatsKHR(pysDevice, surface, &surfaceFormatCount, pdInfo.surfaceFormats.data());
 }
 
 // Determines the best physical device for rendering
@@ -495,19 +529,9 @@ void skeleton::Renderer::CreateCommandBuffers()
 
 void skeleton::Renderer::CreateSwapchain()
 {
-	VkPhysicalDeviceProperties props;
-	vkGetPhysicalDeviceProperties(vulkanContext.gpu.device, &props);
-	VkPhysicalDeviceFeatures features;
-	vkGetPhysicalDeviceFeatures(vulkanContext.gpu.device, &features);
-
-	// Find the best format
-	uint32_t surfaceFormatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(vulkanContext.gpu.device, surface, &surfaceFormatCount, nullptr);
-	std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(vulkanContext.gpu.device, surface, &surfaceFormatCount, surfaceFormats.data());
-
-	VkSurfaceFormatKHR formatInfo = surfaceFormats[0];
-	for (const auto& p : surfaceFormats)
+	// Find the best surface format
+	VkSurfaceFormatKHR formatInfo = vulkanContext.gpu.surfaceFormats[0];
+	for (const auto& p : vulkanContext.gpu.surfaceFormats)
 	{
 		if (p.format == VK_FORMAT_R32G32B32A32_SFLOAT && p.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT)
 		{
@@ -516,13 +540,9 @@ void skeleton::Renderer::CreateSwapchain()
 		}
 	}
 
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(vulkanContext.gpu.device, surface, &presentModeCount, nullptr);
-	std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(vulkanContext.gpu.device, surface, &presentModeCount, presentModes.data());
-
+	// Find the best present mode
 	VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-	for (const auto& p : presentModes)
+	for (const auto& p : vulkanContext.gpu.presentModes)
 	{
 		if (p == VK_PRESENT_MODE_MAILBOX_KHR)
 		{
@@ -532,8 +552,7 @@ void skeleton::Renderer::CreateSwapchain()
 	}
 
 	// Get the device's extent
-	VkSurfaceCapabilitiesKHR capabilities;
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vulkanContext.gpu.device, surface, &capabilities);
+	VkSurfaceCapabilitiesKHR& capabilities = vulkanContext.gpu.surfaceCapabilities;
 	VkExtent2D extent;
 	if (capabilities.currentExtent.width != UINT32_MAX)
 	{
@@ -652,28 +671,8 @@ void skeleton::Renderer::CreateRenderpass()
 	creteInfo.pDependencies = &dependency;
 
 	SKL_ASSERT_VK(
-		vkCreateRenderPass(vulkanContext.device, &creteInfo, nullptr, &renderpass),
+		vkCreateRenderPass(vulkanContext.device, &creteInfo, nullptr, &vulkanContext.renderPass),
 		"Failed to create renderpass");
-}
-
-void skeleton::Renderer::CreatePipelineLayout()
-{
-	//Pipeline Layout/////////////////////////////////////////////////////////
-	VkPipelineLayoutCreateInfo layoutInfo = {};
-	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	layoutInfo.setLayoutCount = 1;
-	layoutInfo.pSetLayouts = &descriptorSetLayout;
-	layoutInfo.pushConstantRangeCount = 0;
-	layoutInfo.pPushConstantRanges = nullptr;
-
-	SKL_ASSERT_VK(
-		vkCreatePipelineLayout(vulkanContext.device, &layoutInfo, nullptr, &pipelineLayout),
-		"Failed to create pipeline layout");
-}
-
-void skeleton::Renderer::CreatePipeline()
-{
-	pipeline = vulkanContext.parProgs[0].GetPipeline(pipelineLayout, renderpass);
 }
 
 void skeleton::Renderer::CreateDepthImage()
@@ -696,7 +695,7 @@ void skeleton::Renderer::CreateFrameBuffers()
 {
 	VkFramebufferCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	createInfo.renderPass = renderpass;
+	createInfo.renderPass = vulkanContext.renderPass;
 	createInfo.layers = 1;
 	createInfo.width = vulkanContext.renderExtent.width;
 	createInfo.height = vulkanContext.renderExtent.height;
@@ -718,6 +717,9 @@ void skeleton::Renderer::CreateFrameBuffers()
 
 void skeleton::Renderer::RecordCommandBuffers()
 {
+	m_boundParProg = 0;
+	skeleton::parProg_t& shader = vulkanContext.parProgs[m_boundParProg];
+
 	uint32_t comandCount = static_cast<uint32_t>(commandBuffers.size());
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -728,7 +730,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 
 	VkRenderPassBeginInfo rpBeginInfo = {};
 	rpBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	rpBeginInfo.renderPass = renderpass;
+	rpBeginInfo.renderPass = vulkanContext.renderPass;
 	rpBeginInfo.clearValueCount = 2;
 	rpBeginInfo.pClearValues = clearValues;
 	rpBeginInfo.renderArea.extent = vulkanContext.renderExtent;
@@ -743,8 +745,10 @@ void skeleton::Renderer::RecordCommandBuffers()
 			"Failed to begin a command buffer");
 
 		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, shader.GetPipeline());
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		//shader.CreateDescriptorSet(commandBuffers[i], descriptorPool);
+		//CreateDescriptorSet(commandBuffers[i], shader);
 		VkDeviceSize offset[] = {0};
 		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertBuffer, offset);
 		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -1003,8 +1007,6 @@ VkSampler skeleton::Renderer::CreateSampler()
 	createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-	VkPhysicalDeviceProperties physicalProps = {};
-	vkGetPhysicalDeviceProperties(vulkanContext.gpu.device, &physicalProps);
 	createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	createInfo.unnormalizedCoordinates = VK_FALSE;
 	createInfo.compareEnable = VK_FALSE;
@@ -1017,7 +1019,7 @@ VkSampler skeleton::Renderer::CreateSampler()
 	// TODO : Make this conditional based on the physicalDevice's capabilities
 	// (Includes physical device selection)
 	createInfo.anisotropyEnable = VK_TRUE;
-	createInfo.maxAnisotropy = physicalProps.limits.maxSamplerAnisotropy;
+	createInfo.maxAnisotropy = vulkanContext.gpu.properties.limits.maxSamplerAnisotropy;
 
 	VkSampler tmpSampler;
 	SKL_ASSERT_VK(

@@ -15,12 +15,10 @@ public:
 
 		skeleton::CreateShader("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
 
-		renderer->descriptorSetLayout = vulkanContext.parProgs[0].descriptorSetLayout;
-
 		renderer->CreateRenderer();
 
 		renderer->CreateModelBuffers();
-		renderer->CreateDescriptorSet();
+		renderer->CreateDescriptorSet(vulkanContext.parProgs[0]);
 		renderer->RecordCommandBuffers();
 	}
 

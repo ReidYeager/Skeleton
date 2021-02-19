@@ -6,6 +6,8 @@
 
 #include "RenderBackend.h"
 
+// TODO : Better handle buffer memory
+
 namespace skeleton
 {
 class BufferManager

@@ -7,13 +7,52 @@
 
 #include <string>
 
-VkPipeline skeleton::parProg_t::GetPipeline()
+VkPipeline skeleton::parProg_t::GetPipeline(
+	VkShaderModule _vertMod,
+	VkShaderModule _fragMod)
 {
 	if (pipeline != VK_NULL_HANDLE)
 	{
 		return pipeline;
 	}
 
+	pipeline = CreatePipeline(
+		_vertMod,
+		_fragMod,
+		pipelineLayout);
+	return pipeline;
+}
+
+void skeleton::CreateShader(
+	const char* _name,
+	sklShaderStageFlags _stages)
+{
+	std::string n(_name);
+
+	uint32_t vertIdx = -1;
+	if (_stages & SKL_SHADER_VERT_STAGE)
+	{
+		vertIdx = skeleton::GetShader(_name, SKL_SHADER_VERT_STAGE);
+	}
+
+	uint32_t fragIdx = -1;
+	if (_stages & SKL_SHADER_FRAG_STAGE)
+	{
+		fragIdx = skeleton::GetShader(_name, SKL_SHADER_FRAG_STAGE);
+	}
+
+	skeleton::parProg_t prog(_name);
+	prog.vertIdx = vertIdx;
+	prog.fragIdx = fragIdx;
+	skeleton::CreateDescriptorSetLayout(prog);
+	vulkanContext.parProgs.push_back(prog);
+}
+
+VkPipeline skeleton::CreatePipeline(
+	VkShaderModule _vertModule,
+	VkShaderModule _fragModule,
+	VkPipelineLayout _pipeLayout)
+{
 	// Viewport State
 	//=================================================
 	VkViewport viewport;
@@ -37,8 +76,8 @@ VkPipeline skeleton::parProg_t::GetPipeline()
 
 	// Vert Input State
 	//=================================================
-	const auto vertexInputBindingDesc = skeleton::Vertex::GetBindingDescription();
-	const auto vertexInputAttribDescs = skeleton::Vertex::GetAttributeDescriptions();
+	const auto vertexInputBindingDesc = skeleton::vertex_t::GetBindingDescription();
+	const auto vertexInputAttribDescs = skeleton::vertex_t::GetAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {};
 	vertexInputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -106,19 +145,16 @@ VkPipeline skeleton::parProg_t::GetPipeline()
 
 	// Shader modules
 	//=================================================
-	VkShaderModule vertModule = vulkanContext.shaders[vertIdx].module;
-	VkShaderModule fragModule = vulkanContext.shaders[fragIdx].module;
-
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
 	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertModule;
+	vertShaderStageInfo.module = _vertModule;
 	vertShaderStageInfo.pName = "main";
 
 	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
 	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragModule;
+	fragShaderStageInfo.module = _fragModule;
 	fragShaderStageInfo.pName = "main";
 
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
@@ -139,42 +175,18 @@ VkPipeline skeleton::parProg_t::GetPipeline()
 	createInfo.stageCount = 2;
 	createInfo.pStages = shaderStages;
 
-	createInfo.layout = pipelineLayout;
+	createInfo.layout = _pipeLayout;
 	createInfo.renderPass = vulkanContext.renderPass;
 
+	VkPipeline tmpPipeline = VK_NULL_HANDLE;
 	SKL_ASSERT_VK(
-		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &pipeline),
+		vkCreateGraphicsPipelines(vulkanContext.device, nullptr, 1, &createInfo, nullptr, &tmpPipeline),
 		"Failed to create graphics pipeline");
 
-	vkDestroyShaderModule(vulkanContext.device, vertModule, nullptr);
-	vkDestroyShaderModule(vulkanContext.device, fragModule, nullptr);
+	vkDestroyShaderModule(vulkanContext.device, _vertModule, nullptr);
+	vkDestroyShaderModule(vulkanContext.device, _fragModule, nullptr);
 
-	return pipeline;
-}
-
-void skeleton::CreateShader(
-	const char* _name,
-	sklShaderStageFlags _stages)
-{
-	std::string n(_name);
-
-	uint32_t vertIdx = -1;
-	if (_stages & SKL_SHADER_VERT_STAGE)
-	{
-		vertIdx = skeleton::GetShader(_name, SKL_SHADER_VERT_STAGE);
-	}
-
-	uint32_t fragIdx = -1;
-	if (_stages & SKL_SHADER_FRAG_STAGE)
-	{
-		fragIdx = skeleton::GetShader(_name, SKL_SHADER_FRAG_STAGE);
-	}
-
-	skeleton::parProg_t prog(_name);
-	prog.vertIdx = vertIdx;
-	prog.fragIdx = fragIdx;
-	skeleton::CreateDescriptorSetLayout(prog);
-	vulkanContext.parProgs.push_back(prog);
+	return tmpPipeline;
 }
 
 uint32_t skeleton::GetShader(const char* _name, sklShaderStageFlags _stage)

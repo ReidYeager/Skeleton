@@ -51,7 +51,9 @@ struct parProg_t
 		compIdx(-1),
 		pipeline(VK_NULL_HANDLE) {}
 
-	VkPipeline GetPipeline();
+	VkPipeline GetPipeline(
+		VkShaderModule _vertMod,
+		VkShaderModule _fragMod);
 
 	const char* name;
 	uint32_t vertIdx;
@@ -63,6 +65,11 @@ struct parProg_t
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 };
+
+VkPipeline CreatePipeline(
+	VkShaderModule _vertModule,
+	VkShaderModule _fragModule,
+	VkPipelineLayout _pipeLayout);
 
 void CreateShader(
 	const char* _name,

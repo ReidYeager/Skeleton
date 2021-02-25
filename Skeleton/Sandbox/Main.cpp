@@ -14,6 +14,7 @@ public:
 		__super::Init();
 
 		skeleton::CreateShader("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
+		CreateObject("./res/models/SphereSmooth.obj");
 
 		renderer->CreateRenderer();
 

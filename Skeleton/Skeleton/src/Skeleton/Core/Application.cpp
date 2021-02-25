@@ -4,7 +4,8 @@
 #include <chrono>
 
 #include "Skeleton/Core/Common.h"
-#include "Application.h"
+#include "Skeleton/Core/Application.h"
+#include "Skeleton/Core/FileSystem.h"
 
 void skeleton::Application::Init()
 {
@@ -65,9 +66,18 @@ void skeleton::Application::DefineShaders()
 	
 }
 
+void skeleton::Application::CreateObject(const char* _directory)
+{
+	mesh_t m = skeleton::tools::LoadMesh(_directory, renderer->bufferManager);
+	if (m.verticies.size() > 0)
+	{
+		vulkanContext.meshes.push_back(m);
+	}
+}
+
 void skeleton::Application::CoreLoop()
 {
-	SKL_PRINT_SLIM("%f, %f, %6u, %8f FPS", sklTime.totalTime, sklTime.deltaTime, sklTime.frameCount, 1.f/sklTime.deltaTime);
+	SKL_PRINT_SLIM("%8f, %8f, %6u, %8f FPS", sklTime.totalTime, sklTime.deltaTime, sklTime.frameCount, 1.f/sklTime.deltaTime);
 	static SDL_Event e;
 	static auto startTime = std::chrono::high_resolution_clock::now();
 	static auto prevTime = startTime;

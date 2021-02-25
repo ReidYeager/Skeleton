@@ -36,6 +36,9 @@ protected:
 	void MainLoop();
 	void DefineShaders();
 
+	void CreateObject(
+		const char* _directory);
+
 private:
 	void CoreLoop();
 

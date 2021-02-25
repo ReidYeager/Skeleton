@@ -13,17 +13,18 @@
 #include "Skeleton/Core/FileSystem.h"
 #include "Skeleton/Core/Vertex.h"
 #include "Skeleton/Renderer/ParProgs.h"
+#include "Skeleton/Core/Mesh.h"
 
-const std::vector<skeleton::Vertex> verts = {
-	{{-0.5f,  0.5f, 0.0f}, {0.87843137255f, 0.54509803922f, 0.07843137255f}, {0.0f, 0.0f}},
-	{{ 0.5f,  0.5f, 0.0f}, {0.07843137255f, 0.87843137255f, 0.54509803922f}, {1.0f, 0.0f}},
-	{{ 0.5f, -0.5f, 0.0f}, {0.54509803922f, 0.07843137255f, 0.87843137255f}, {1.0f, 1.0f}},
-	{{-0.5f, -0.5f, 0.0f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}},
+const std::vector<skeleton::vertex_t> verts = {
+	{{-0.5f,  0.5f, 0.0f}, {0.0f, 0.0f}, {0.f, 0.f, -1.f}},
+	{{ 0.5f,  0.5f, 0.0f}, {1.0f, 0.0f}, {0.f, 0.f, -1.f}},
+	{{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f}, {0.f, 0.f, -1.f}},
+	{{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f}, {0.f, 0.f, -1.f}},
 
-	{{ -0.25f,  0.5f, 0.5f}, {1.f, 0.f, 0.f}, {0.0f, 0.0f}},
-	{{  0.75f,  0.5f, 0.5f}, {0.f, 1.f, 0.f}, {1.0f, 0.0f}},
-	{{  0.25f, -0.5f, 0.5f}, {0.f, 0.f, 1.f}, {1.0f, 1.0f}},
-	{{ -0.75f, -0.5f, 0.5f}, {1.f, 1.f, 1.f}, {0.0f, 1.0f}}
+	{{ -0.25f,  0.5f, 0.5f}, {0.0f, 0.0f}, {0.f, 0.f, -1.f}},
+	{{  0.75f,  0.5f, 0.5f}, {1.0f, 0.0f}, {0.f, 0.f, -1.f}},
+	{{  0.25f, -0.5f, 0.5f}, {1.0f, 1.0f}, {0.f, 0.f, -1.f}},
+	{{ -0.75f, -0.5f, 0.5f}, {0.0f, 1.0f}, {0.f, 0.f, -1.f}}
 };
 
 const std::vector<uint32_t> indices = {
@@ -68,7 +69,7 @@ skeleton::Renderer::~Renderer()
 	vkDestroyCommandPool(vulkanContext.device, graphicsPool, nullptr);
 
 	delete(bufferManager);
-	vkDestroyDevice(vulkanContext.device, nullptr);
+	vulkanContext.Cleanup();
 	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
@@ -275,13 +276,13 @@ void skeleton::Renderer::CleanupRenderer()
 	vkFreeMemory(vulkanContext.device, depthMemory, nullptr);
 	vkDestroyImageView(vulkanContext.device, depthImageView, nullptr);
 
-	for (uint32_t i = 0; i < vulkanContext.parProgs.size(); i++)
-	{
-		parProg_t& shader = vulkanContext.parProgs[i];
-		vkDestroyPipeline(vulkanContext.device, shader.GetPipeline(), nullptr);
-		vkDestroyPipelineLayout(vulkanContext.device, shader.pipelineLayout, nullptr);
-	}
-	vkDestroyRenderPass(vulkanContext.device, vulkanContext.renderPass, nullptr);
+	//for (uint32_t i = 0; i < vulkanContext.parProgs.size(); i++)
+	//{
+	//	parProg_t& shader = vulkanContext.parProgs[i];
+	//	vkDestroyPipeline(vulkanContext.device, shader.GetPipeline(), nullptr);
+	//	vkDestroyPipelineLayout(vulkanContext.device, shader.pipelineLayout, nullptr);
+	//}
+	//vkDestroyRenderPass(vulkanContext.device, vulkanContext.renderPass, nullptr);
 
 	for (const auto& view : swapchainImageViews)
 	{
@@ -745,15 +746,20 @@ void skeleton::Renderer::RecordCommandBuffers()
 			"Failed to begin a command buffer");
 
 		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, shader.GetPipeline());
+		vkCmdBindPipeline(
+			commandBuffers[i],
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			shader.GetPipeline(vulkanContext.shaders[shader.vertIdx].module, vulkanContext.shaders[shader.fragIdx].module));
 		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-		//shader.CreateDescriptorSet(commandBuffers[i], descriptorPool);
-		//CreateDescriptorSet(commandBuffers[i], shader);
 		VkDeviceSize offset[] = {0};
-		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &vertBuffer, offset);
-		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
+		for (uint32_t j = 0; j < vulkanContext.meshes.size(); j++)
+		{
+			mesh_t& mesh = vulkanContext.meshes[j];
+			vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &mesh.vertexBuffer, offset);
+			vkCmdBindIndexBuffer(commandBuffers[i], mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+			vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+		}
 
 		vkCmdEndRenderPass(commandBuffers[i]);
 

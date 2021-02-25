@@ -5,6 +5,7 @@
 
 #include "Skeleton/Core/Common.h"
 #include "Skeleton/Renderer/ParProgs.h"
+#include "Skeleton/Core/Mesh.h"
 
 // TODO : Clean this file up
 
@@ -41,6 +42,10 @@ struct SklVulkanContext_t
 
 	VkExtent2D renderExtent;
 	VkRenderPass renderPass;
+
+	std::vector<skeleton::mesh_t> meshes;
+
+	void Cleanup();
 };
 
 extern SklVulkanContext_t vulkanContext;

@@ -195,6 +195,7 @@
     <ClInclude Include="src\Skeleton\Core\Camera.h" />
     <ClInclude Include="src\Skeleton\Core\Common.h" />
     <ClInclude Include="src\Skeleton\Core\DebugTools.h" />
+    <ClInclude Include="src\Skeleton\Core\Mesh.h" />
     <ClInclude Include="src\Skeleton\Core\Time.h" />
     <ClInclude Include="src\Skeleton\Core\Transform.h" />
     <ClInclude Include="src\Skeleton\Core\Vertex.h" />

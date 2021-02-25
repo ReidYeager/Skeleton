@@ -82,6 +82,11 @@ inline const char* VulkanResultToString(
 	SKL_PRINT_SLIM("\t%s :--: %d", __FILE__, __LINE__);	\
 }
 
+#define SKL_PRINT_ERROR(message, ...)				\
+{													\
+	SKL_LOG(__FUNCTION__, message, __VA_ARGS__);	\
+}
+
 #define SKL_ASSERT_VK(vkFunction, errorMessage, ...)			\
 {																\
 	VkResult vkAssertResult = vkFunction;						\

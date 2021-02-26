@@ -13,13 +13,14 @@ public:
 	{
 		__super::Init();
 
-		skeleton::CreateShader("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE);
+		uint32_t i = skeleton::GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
 		CreateObject("./res/models/SphereSmooth.obj");
+		CreateObject("./res/models/Cube.obj");
 
 		renderer->CreateRenderer();
 
 		renderer->CreateModelBuffers();
-		renderer->CreateDescriptorSet(vulkanContext.parProgs[0]);
+		renderer->CreateDescriptorSet(vulkanContext.parProgs[i]);
 		renderer->RecordCommandBuffers();
 	}
 

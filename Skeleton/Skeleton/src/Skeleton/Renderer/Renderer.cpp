@@ -15,26 +15,6 @@
 #include "Skeleton/Renderer/ParProgs.h"
 #include "Skeleton/Core/Mesh.h"
 
-const std::vector<skeleton::vertex_t> verts = {
-	{{-0.5f,  0.5f, 0.0f}, {0.0f, 0.0f}, {0.f, 0.f, -1.f}},
-	{{ 0.5f,  0.5f, 0.0f}, {1.0f, 0.0f}, {0.f, 0.f, -1.f}},
-	{{ 0.5f, -0.5f, 0.0f}, {1.0f, 1.0f}, {0.f, 0.f, -1.f}},
-	{{-0.5f, -0.5f, 0.0f}, {0.0f, 1.0f}, {0.f, 0.f, -1.f}},
-
-	{{ -0.25f,  0.5f, 0.5f}, {0.0f, 0.0f}, {0.f, 0.f, -1.f}},
-	{{  0.75f,  0.5f, 0.5f}, {1.0f, 0.0f}, {0.f, 0.f, -1.f}},
-	{{  0.25f, -0.5f, 0.5f}, {1.0f, 1.0f}, {0.f, 0.f, -1.f}},
-	{{ -0.75f, -0.5f, 0.5f}, {0.0f, 1.0f}, {0.f, 0.f, -1.f}}
-};
-
-const std::vector<uint32_t> indices = {
-	2, 1, 0,
-	0, 3, 2,
-
-	6, 5, 4,
-	4, 7, 6
-};
-
 //=================================================
 // Initialize & Cleanup
 //=================================================
@@ -864,22 +844,6 @@ VkImageView skeleton::Renderer::CreateImageView(
 
 void skeleton::Renderer::CreateModelBuffers()
 {
-	// Create vertex buffer
-	bufferManager->CreateAndFillBuffer(
-		vertBuffer,
-		vertMemory,
-		verts.data(),
-		sizeof(verts[0]) * verts.size(),
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-
-	// Create index buffer
-	bufferManager->CreateAndFillBuffer(
-		indexBuffer,
-		indexMemory,
-		indices.data(),
-		sizeof(indices[0]) * indices.size(),
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-
 	// Create uniform buffer
 	VkDeviceSize mvpSize = sizeof(MVPMatrices);
 	bufferManager->CreateBuffer(

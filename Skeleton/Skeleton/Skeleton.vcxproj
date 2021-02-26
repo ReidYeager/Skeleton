@@ -199,7 +199,6 @@
     <ClInclude Include="src\Skeleton\Core\Time.h" />
     <ClInclude Include="src\Skeleton\Core\Transform.h" />
     <ClInclude Include="src\Skeleton\Core\Vertex.h" />
-    <ClInclude Include="src\Skeleton\Renderer\BufferManager.h" />
     <ClInclude Include="src\Skeleton\Renderer\Image.h" />
     <ClInclude Include="src\Skeleton\Renderer\ParProgs.h" />
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
@@ -215,7 +214,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\Skeleton\Core\Application.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\BufferManager.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\RenderBackend.cpp" />

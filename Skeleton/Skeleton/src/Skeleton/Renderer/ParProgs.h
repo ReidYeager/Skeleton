@@ -12,6 +12,10 @@
 typedef uint32_t sklFlags;
 typedef sklFlags sklShaderStageFlags;
 typedef sklFlags sklShaderBindingFlags;
+
+typedef uint64_t sklExFlags;
+typedef sklExFlags sklPipelineSettingFlags;
+
 typedef enum sklShaderStageFlagBits
 {
 	SKL_SHADER_VERT_STAGE = 0x1,
@@ -24,6 +28,19 @@ typedef enum sklShaderBindingFlagBits
 	SKL_BINDING_SAMPLER,
 	SKL_BINDING_MAX_COUNT
 }sklShaderBindingFlagBits;
+typedef enum sklPipelineSettingFlagBits
+{
+	// TODO : Implement options for all pipeline settings
+	// Polygon cull mode
+	SKL_CULL_MODE_NONE  = (0 << 0),
+	SKL_CULL_MODE_FRONT = (1 << 0),
+	SKL_CULL_MODE_BACK  = (2 << 0),
+	SKL_CULL_MODE_BOTH  = (3 << 0),
+	SKL_CULL_MODE_BITS  = (3 << 0),
+
+	// Default values for each setting
+	SKL_PIPELINE_DEFAULT_SETTINGS = SKL_CULL_MODE_BACK
+}sklPipelineSettingFlagBits;
 
 namespace skeleton
 {
@@ -46,6 +63,7 @@ struct parProg_t
 {
 	parProg_t(const char* _name) :
 		name(_name),
+		pipelineSettings(SKL_PIPELINE_DEFAULT_SETTINGS),
 		vertIdx(-1),
 		fragIdx(-1),
 		compIdx(-1),
@@ -56,6 +74,8 @@ struct parProg_t
 		VkShaderModule _fragMod);
 
 	const char* name;
+	uint64_t pipelineSettings;
+
 	uint32_t vertIdx;
 	uint32_t fragIdx;
 	uint32_t compIdx;
@@ -69,11 +89,18 @@ struct parProg_t
 VkPipeline CreatePipeline(
 	VkShaderModule _vertModule,
 	VkShaderModule _fragModule,
-	VkPipelineLayout _pipeLayout);
+	VkPipelineLayout _pipeLayout,
+	uint64_t _pipelineSettings);
 
-void CreateShader(
+uint32_t GetProgram(
 	const char* _name,
-	sklShaderStageFlags _stages);
+	sklShaderStageFlags _stages,
+	uint64_t _pipelineSettings = 1);
+
+void CreateProgram(
+	const char* _name,
+	sklShaderStageFlags _stages,
+	uint64_t _pipelineSettings = 1);
 
 uint32_t GetShader(const char* _name, sklShaderStageFlags _stage);
 

@@ -19,13 +19,36 @@ VkPipeline skeleton::parProg_t::GetPipeline(
 	pipeline = CreatePipeline(
 		_vertMod,
 		_fragMod,
-		pipelineLayout);
+		pipelineLayout,
+		pipelineSettings);
 	return pipeline;
 }
 
-void skeleton::CreateShader(
+uint32_t skeleton::GetProgram(
 	const char* _name,
-	sklShaderStageFlags _stages)
+	sklShaderStageFlags _stages,
+	uint64_t _pipelineSettings /*= 1*/)
+{
+	uint32_t i;
+	for (i = 0; i < vulkanContext.parProgs.size(); i++)
+	{
+		parProg_t& prog = vulkanContext.parProgs[i];
+		if (prog.pipelineSettings == _pipelineSettings && std::strcmp(_name, prog.name) == 0)
+		{
+			return i;
+		}
+	}
+
+	i = static_cast<uint32_t>(vulkanContext.parProgs.size());
+	SKL_PRINT_SIMPLE("Creating new program for %s -- %u", _name, i);
+	CreateProgram(_name, _stages, _pipelineSettings);
+	return i;
+}
+
+void skeleton::CreateProgram(
+	const char* _name,
+	sklShaderStageFlags _stages,
+	uint64_t _pipelineSettings /*= 1*/)
 {
 	std::string n(_name);
 
@@ -42,6 +65,7 @@ void skeleton::CreateShader(
 	}
 
 	skeleton::parProg_t prog(_name);
+	prog.pipelineSettings = _pipelineSettings;
 	prog.vertIdx = vertIdx;
 	prog.fragIdx = fragIdx;
 	skeleton::CreateDescriptorSetLayout(prog);
@@ -51,7 +75,8 @@ void skeleton::CreateShader(
 VkPipeline skeleton::CreatePipeline(
 	VkShaderModule _vertModule,
 	VkShaderModule _fragModule,
-	VkPipelineLayout _pipeLayout)
+	VkPipelineLayout _pipeLayout,
+	uint64_t _pipelineSettings)
 {
 	// Viewport State
 	//=================================================
@@ -100,12 +125,19 @@ VkPipeline skeleton::CreatePipeline(
 	rasterStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	//rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterStateInfo.cullMode = VK_CULL_MODE_NONE;
 	rasterStateInfo.rasterizerDiscardEnable = VK_TRUE;
 	rasterStateInfo.lineWidth = 1.f;
 	rasterStateInfo.depthBiasEnable = VK_FALSE;
 	rasterStateInfo.depthClampEnable = VK_FALSE;
 	rasterStateInfo.rasterizerDiscardEnable = VK_FALSE;
+
+	switch (_pipelineSettings & SKL_CULL_MODE_BITS)
+	{
+		case SKL_CULL_MODE_NONE: rasterStateInfo.cullMode = VK_CULL_MODE_NONE; break;
+		case SKL_CULL_MODE_BACK: rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT; break;
+		case SKL_CULL_MODE_FRONT: rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_BIT; break;
+		case SKL_CULL_MODE_BOTH: rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_AND_BACK; break;
+	}
 
 	// Multisample State
 	//=================================================

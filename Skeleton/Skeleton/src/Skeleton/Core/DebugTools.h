@@ -65,9 +65,14 @@ inline const char* VulkanResultToString(
 
 #define SKL_PRINT(category, message, ...)	\
 {											\
-	printf("%-15s :--: ", category);		\
+	printf("%-25s :--: ", category);		\
 	printf(message, __VA_ARGS__);			\
 	printf("\n");							\
+}
+
+#define SKL_PRINT_SIMPLE(message, ...)				\
+{													\
+	SKL_PRINT(__FUNCTION__, message, __VA_ARGS__);	\
 }
 
 #define SKL_PRINT_SLIM(message, ...)	\

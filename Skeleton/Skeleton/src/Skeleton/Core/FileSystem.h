@@ -11,7 +11,7 @@
 #include "tinyobjloader/tiny_obj_loader.h"
 
 #include "Common.h"
-#include "Skeleton/Renderer/BufferManager.h"
+#include "Skeleton/Renderer/RenderBackend.h"
 
 namespace skeleton::tools
 {

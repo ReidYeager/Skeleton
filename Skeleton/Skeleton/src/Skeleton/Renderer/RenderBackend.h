@@ -12,6 +12,27 @@
 #ifndef SKL_RENDER_BACKEND_H
 #define SKL_RENDER_BACKEND_H
 
+struct sklBuffer_t
+{
+	VkBuffer buffer;
+	VkDeviceMemory memory;
+};
+
+struct sklImage_t
+{
+	VkImage image;
+	VkImageView view;
+	VkDeviceMemory memory;
+};
+
+struct sklRenderable_t
+{
+	skeleton::mesh_t mesh;
+	uint32_t parProgIndex;
+	std::vector<sklBuffer_t*> buffers;
+	std::vector<sklImage_t*> images;
+};
+
 struct SklPhysicalDeviceInfo_t
 {
 	VkPhysicalDevice						device;
@@ -43,9 +64,15 @@ struct SklVulkanContext_t
 	VkExtent2D renderExtent;
 	VkRenderPass renderPass;
 
-	std::vector<skeleton::mesh_t> meshes;
+	std::vector<sklRenderable_t> renderables;
 
 	void Cleanup();
+};
+
+struct sklView_t
+{
+	glm::mat4 mvpMatrix;						// This view's MVP
+	std::vector<sklRenderable_t> renderables;	// Objects this view can see
 };
 
 extern SklVulkanContext_t vulkanContext;

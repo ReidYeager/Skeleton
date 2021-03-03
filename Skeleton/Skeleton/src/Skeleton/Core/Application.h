@@ -35,12 +35,16 @@ public:
 protected:
 	void MainLoop();
 	void DefineShaders();
+	virtual void CoreLoop() = 0;
 
 	void CreateObject(
+		const char* _meshDirectory,
+		uint32_t _shaderIndex);
+	mesh_t CreateMesh(
 		const char* _directory);
-
-private:
-	void CoreLoop();
+	sklRenderable_t CreateRenderable(
+		mesh_t _mesh,
+		uint32_t _shaderIndex);
 
 }; // Application
 } // namespace skeleton

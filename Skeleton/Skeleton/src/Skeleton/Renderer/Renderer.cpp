@@ -699,7 +699,7 @@ void skeleton::Renderer::CreateFrameBuffers()
 void skeleton::Renderer::RecordCommandBuffers()
 {
 	m_boundParProg = 0;
-	skeleton::parProg_t& shader = vulkanContext.parProgs[m_boundParProg];
+	skeleton::parProg_t* parProg;
 
 	uint32_t comandCount = static_cast<uint32_t>(commandBuffers.size());
 	VkCommandBufferBeginInfo beginInfo = {};
@@ -720,22 +720,24 @@ void skeleton::Renderer::RecordCommandBuffers()
 	for (uint32_t i = 0; i < comandCount; i++)
 	{
 		rpBeginInfo.framebuffer = frameBuffers[i];
-
 		SKL_ASSERT_VK(
 			vkBeginCommandBuffer(commandBuffers[i], &beginInfo),
 			"Failed to begin a command buffer");
 
 		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(
-			commandBuffers[i],
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			shader.GetPipeline(vulkanContext.shaders[shader.vertIdx].module, vulkanContext.shaders[shader.fragIdx].module));
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, shader.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-		VkDeviceSize offset[] = {0};
 
-		for (uint32_t j = 0; j < vulkanContext.meshes.size(); j++)
+		for (uint32_t j = 0; j < vulkanContext.renderables.size(); j++)
 		{
-			mesh_t& mesh = vulkanContext.meshes[j];
+			SKL_PRINT_SLIM("%u %u", i, j);
+			parProg = &vulkanContext.parProgs[vulkanContext.renderables[j].parProgIndex];
+			vkCmdBindPipeline(
+				commandBuffers[i],
+				VK_PIPELINE_BIND_POINT_GRAPHICS,
+				parProg->GetPipeline(vulkanContext.shaders[parProg->vertIdx].module, vulkanContext.shaders[parProg->fragIdx].module));
+			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, parProg->pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			VkDeviceSize offset[] = { 0 };
+
+			mesh_t& mesh = vulkanContext.renderables[j].mesh;
 			vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, &mesh.vertexBuffer, offset);
 			vkCmdBindIndexBuffer(commandBuffers[i], mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);

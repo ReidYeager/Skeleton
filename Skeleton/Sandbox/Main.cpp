@@ -14,8 +14,10 @@ public:
 		__super::Init();
 
 		uint32_t i = skeleton::GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
-		CreateObject("./res/models/SphereSmooth.obj");
-		CreateObject("./res/models/Cube.obj");
+		uint32_t j = skeleton::GetProgram("blue", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_BACK);
+		CreateObject("./res/models/SphereSmooth.obj", j);
+		CreateObject("./res/models/SphereSmooth.obj", i);
+		CreateObject("./res/models/Cube.obj", i);
 
 		renderer->CreateRenderer();
 
@@ -24,14 +26,9 @@ public:
 		renderer->RecordCommandBuffers();
 	}
 
-	void Run()
+	void CoreLoop()
 	{
-		__super::Run();
-	}
-
-	void Cleanup()
-	{
-		__super::Cleanup();
+		
 	}
 
 };

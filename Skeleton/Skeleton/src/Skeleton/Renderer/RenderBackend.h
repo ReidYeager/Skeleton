@@ -23,6 +23,7 @@ struct sklImage_t
 	VkImage image;
 	VkImageView view;
 	VkDeviceMemory memory;
+	VkSampler sampler;
 };
 
 struct sklRenderable_t
@@ -31,6 +32,10 @@ struct sklRenderable_t
 	uint32_t parProgIndex;
 	std::vector<sklBuffer_t*> buffers;
 	std::vector<sklImage_t*> images;
+
+	// TODO : Create buffer/image function
+
+	void Cleanup();
 };
 
 struct SklPhysicalDeviceInfo_t

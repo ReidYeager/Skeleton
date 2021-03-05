@@ -13,22 +13,26 @@ public:
 	{
 		__super::Init();
 
+		renderer->CreateRenderer();
+		renderer->CreateModelBuffers();
+
 		uint32_t i = skeleton::GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
 		uint32_t j = skeleton::GetProgram("blue", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_BACK);
 		CreateObject("./res/models/SphereSmooth.obj", j);
 		CreateObject("./res/models/SphereSmooth.obj", i);
 		CreateObject("./res/models/Cube.obj", i);
 
-		renderer->CreateRenderer();
 
-		renderer->CreateModelBuffers();
-		renderer->CreateDescriptorSet(vulkanContext.parProgs[i]);
+		//renderer->CreateDescriptorSet(vulkanContext.parProgs[i], );
 		renderer->RecordCommandBuffers();
 	}
 
 	void CoreLoop()
 	{
-		
+		for (const auto& r : vulkanContext.renderables)
+		{
+			renderer->bufferManager->CopyBuffer(renderer->mvpBuffer, r.buffers[0]->buffer, sizeof(mvp));
+		}
 	}
 
 };

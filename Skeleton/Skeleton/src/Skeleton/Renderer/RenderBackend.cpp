@@ -300,6 +300,28 @@ void SklVulkanContext_t::Cleanup()
 		vkDestroyDescriptorSetLayout(device, parProgs[i].descriptorSetLayout, nullptr);
 	}
 
+	for (auto& rend : renderables)
+	{
+		rend.Cleanup();
+	}
+
 	vkDestroyRenderPass(device, renderPass, nullptr);
 	vkDestroyDevice(device, nullptr);
+}
+
+void sklRenderable_t::Cleanup()
+{
+	//for (const auto& b : buffers)
+		//{
+		//	vkDestroyBuffer(vulkanContext.device, b->buffer, nullptr);
+		//	vkFreeMemory(vulkanContext.device, b->memory, nullptr);
+		//}
+
+	for (const auto& i : images)
+	{
+		vkFreeMemory(vulkanContext.device, i->memory, nullptr);
+		vkDestroySampler(vulkanContext.device, i->sampler, nullptr);
+		vkDestroyImageView(vulkanContext.device, i->view, nullptr);
+		vkDestroyImage(vulkanContext.device, i->image, nullptr);
+	}
 }

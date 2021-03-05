@@ -106,15 +106,15 @@ void skeleton::Renderer::CreateDescriptorPool()
 {
 	VkDescriptorPoolSize poolSizes[2] = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = 1;
+	poolSizes[0].descriptorCount = 3;
 	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	poolSizes[1].descriptorCount = 2;
+	poolSizes[1].descriptorCount = 6;
 
 	VkDescriptorPoolCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	createInfo.poolSizeCount = 2;
 	createInfo.pPoolSizes = poolSizes;
-	createInfo.maxSets = 1;
+	createInfo.maxSets = 3;
 
 	SKL_ASSERT_VK(
 		vkCreateDescriptorPool(vulkanContext.device, &createInfo, nullptr, &descriptorPool),
@@ -122,7 +122,9 @@ void skeleton::Renderer::CreateDescriptorPool()
 }
 
 // TODO : Make this dynamic alongside DescriptorLayout.
-void skeleton::Renderer::CreateDescriptorSet(parProg_t& _prog)
+void skeleton::Renderer::CreateDescriptorSet(
+	parProg_t& _prog,
+	sklRenderable_t& _renderable)
 {
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -131,62 +133,93 @@ void skeleton::Renderer::CreateDescriptorSet(parProg_t& _prog)
 	allocInfo.pSetLayouts = &_prog.descriptorSetLayout;
 
 	SKL_ASSERT_VK(
-		vkAllocateDescriptorSets(vulkanContext.device, &allocInfo, &descriptorSet),
+		vkAllocateDescriptorSets(vulkanContext.device, &allocInfo, &_prog.descriptorSet),
 		"Failed to allocate descriptor set");
 
-	// mvp buffer
-	VkDescriptorBufferInfo bufferInfo = {};
-	bufferInfo.buffer = mvpBuffer;
-	bufferInfo.offset = 0;
-	bufferInfo.range = VK_WHOLE_SIZE;
+	uint32_t bufferidx = 0, imageidx = 0;
+	std::vector<VkDescriptorBufferInfo> bufferInfos;
+	std::vector<VkDescriptorImageInfo> imageInfos;
+	std::vector< VkWriteDescriptorSet> writeSets(_prog.bindings.size());
 
-	// Texture sampler
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.sampler = textureSampler;
-	imageInfo.imageView = textureImageView;
+	for (uint32_t i = 0; i < _prog.bindings.size(); i++)
+	{
+		if (_prog.bindings[i] == SKL_BINDING_BUFFER)
+		{
+			bufferidx++;
+		}
+		else
+		{
+			imageidx++;
+		}
+	}
 
-	// Texture sampler
-	VkDescriptorImageInfo altImageInfo = {};
-	altImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	altImageInfo.sampler = alttextureSampler;
-	altImageInfo.imageView = alttextureImageView;
 
-	VkWriteDescriptorSet descWrites[3] = {};
-	descWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descWrites[0].dstSet = descriptorSet;
-	descWrites[0].dstBinding = 0;
-	descWrites[0].dstArrayElement = 0;
-	descWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descWrites[0].descriptorCount = 1;
-	descWrites[0].pBufferInfo = &bufferInfo;
-	descWrites[0].pImageInfo = nullptr;
-	descWrites[0].pTexelBufferView = nullptr;
+	bufferInfos.resize(bufferidx);
+	imageInfos.resize(imageidx);
+	bufferidx = 0;
+	imageidx = 0;
 
-	descWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descWrites[1].dstSet = descriptorSet;
-	descWrites[1].dstBinding = 1;
-	descWrites[1].dstArrayElement = 0;
-	descWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descWrites[1].descriptorCount = 1;
-	descWrites[1].pBufferInfo = nullptr;
-	descWrites[1].pImageInfo = &imageInfo;
-	descWrites[1].pTexelBufferView = nullptr;
+	for (uint32_t i = 0; i < _prog.bindings.size(); i++)
+	{
+		if (_prog.bindings[i] == SKL_BINDING_BUFFER)
+		{
+			sklBuffer_t* buf = new sklBuffer_t();
+			bufferManager->CreateBuffer(
+				buf->buffer,
+				buf->memory,
+				sizeof(MVPMatrices),
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			_renderable.buffers.push_back(buf);
 
-	descWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descWrites[2].dstSet = descriptorSet;
-	descWrites[2].dstBinding = 2;
-	descWrites[2].dstArrayElement = 0;
-	descWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descWrites[2].descriptorCount = 1;
-	descWrites[2].pBufferInfo = nullptr;
-	descWrites[2].pImageInfo = &altImageInfo;
-	descWrites[2].pTexelBufferView = nullptr;
+			bufferInfos[bufferidx].buffer = buf->buffer;
+			bufferInfos[bufferidx].offset = 0;
+			bufferInfos[bufferidx].range = VK_WHOLE_SIZE;
 
-	vkUpdateDescriptorSets(vulkanContext.device, 3, descWrites, 0, nullptr);
+			writeSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeSets[i].dstSet = _prog.descriptorSet;
+			writeSets[i].dstBinding = i;
+			writeSets[i].dstArrayElement = 0;
+			writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writeSets[i].descriptorCount = 1;
+			writeSets[i].pBufferInfo = &bufferInfos[bufferidx];
+			writeSets[i].pImageInfo = nullptr;
+			writeSets[i].pTexelBufferView = nullptr;
 
-	//vkCmdBindPipeline(_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _prog.GetPipeline());
-	//vkCmdBindDescriptorSets(_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _prog.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			bufferidx++;
+		}
+		else
+		{
+			sklImage_t* imageA = new sklImage_t();
+			CreateTextureImage(
+				((i % 2 == 0) ? "res/AltImage.png" : "res/TestImage.png"),
+				imageA->image,
+				imageA->view,
+				imageA->memory,
+				imageA->sampler);
+			uint32_t rendImageIdx = static_cast<uint32_t>(_renderable.images.size());
+			_renderable.images.push_back(imageA);
+
+			VkDescriptorImageInfo imageInfoA = {};
+			imageInfos[imageidx].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfos[imageidx].sampler = _renderable.images[rendImageIdx]->sampler;
+			imageInfos[imageidx].imageView = _renderable.images[rendImageIdx]->view;
+
+			writeSets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writeSets[i].dstSet = _prog.descriptorSet;
+			writeSets[i].dstBinding = i;
+			writeSets[i].dstArrayElement = 0;
+			writeSets[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writeSets[i].descriptorCount = 1;
+			writeSets[i].pBufferInfo = nullptr;
+			writeSets[i].pImageInfo = &imageInfos[imageidx];
+			writeSets[i].pTexelBufferView = nullptr;
+
+			imageidx++;
+		}
+	}
+
+	vkUpdateDescriptorSets(vulkanContext.device, static_cast<uint32_t>(writeSets.size()), writeSets.data(), 0, nullptr);
 }
 
 //=================================================
@@ -726,6 +759,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 
 		vkCmdBeginRenderPass(commandBuffers[i], &rpBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+		// TODO : Only bind pipelines once
 		for (uint32_t j = 0; j < vulkanContext.renderables.size(); j++)
 		{
 			SKL_PRINT_SLIM("%u %u", i, j);
@@ -734,7 +768,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 				commandBuffers[i],
 				VK_PIPELINE_BIND_POINT_GRAPHICS,
 				parProg->GetPipeline(vulkanContext.shaders[parProg->vertIdx].module, vulkanContext.shaders[parProg->fragIdx].module));
-			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, parProg->pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+			vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, parProg->pipelineLayout, 0, 1, &parProg->descriptorSet, 0, nullptr);
 			VkDeviceSize offset[] = { 0 };
 
 			mesh_t& mesh = vulkanContext.renderables[j].mesh;
@@ -852,7 +886,7 @@ void skeleton::Renderer::CreateModelBuffers()
 		mvpBuffer,
 		mvpMemory,
 		mvpSize,
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 

@@ -111,7 +111,9 @@ public:
 	void RenderFrame();
 
 	void CreateDescriptorPool();
-	void CreateDescriptorSet(parProg_t& _prog);
+	void CreateDescriptorSet(
+		parProg_t& _prog,
+		sklRenderable_t& _renderable);
 
 	void CreateModelBuffers();
 	void RecordCommandBuffers();

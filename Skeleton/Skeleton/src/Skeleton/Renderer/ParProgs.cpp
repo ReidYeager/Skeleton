@@ -382,6 +382,7 @@ void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	createInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	createInfo.pBindings = bindings.data();
+	SKL_PRINT("ParProg", "%s has %u bindings", _program.name, static_cast<uint32_t>(bindings.size()));
 
 	SKL_ASSERT_VK(
 		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &_program.descriptorSetLayout),

@@ -131,8 +131,8 @@ void skeleton::Application::CreateObject(
 	const char* _meshDirectory,
 	uint32_t _parProgIndex)
 {
-	vulkanContext.renderables.push_back(
-		CreateRenderable(CreateMesh(_meshDirectory), _parProgIndex));
+	vulkanContext.renderables.push_back(CreateRenderable(CreateMesh(_meshDirectory), _parProgIndex));
+	renderer->CreateDescriptorSet(vulkanContext.parProgs[_parProgIndex], vulkanContext.renderables[vulkanContext.renderables.size() - 1]);
 }
 
 skeleton::mesh_t skeleton::Application::CreateMesh(

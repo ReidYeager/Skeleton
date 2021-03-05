@@ -82,6 +82,7 @@ struct parProg_t
 
 	std::vector<sklShaderBindingFlags> bindings;
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSet descriptorSet;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline pipeline;
 };

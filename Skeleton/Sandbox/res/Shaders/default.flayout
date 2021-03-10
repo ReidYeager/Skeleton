@@ -7,7 +7,3 @@ buffer {
 uniforms {
 }
 
-# input layouts -- per-vertex data
-vertex {
-}
-

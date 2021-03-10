@@ -54,7 +54,7 @@
     <ClInclude Include="src\Skeleton\Renderer\ParProgs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\RenderBackend.h">
+    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Renderable.h">
@@ -80,7 +80,7 @@
     <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\RenderBackend.cpp">
+    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Renderable.cpp">

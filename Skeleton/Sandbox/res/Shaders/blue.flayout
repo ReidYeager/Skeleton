@@ -6,8 +6,3 @@ buffer {
 # uniforms -- buffer and samplers
 uniforms {
 }
-
-# input layouts -- per-vertex data
-vertex {
-}
-

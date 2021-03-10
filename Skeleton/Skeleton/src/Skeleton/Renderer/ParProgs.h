@@ -42,8 +42,6 @@ typedef enum sklPipelineSettingFlagBits
 	SKL_PIPELINE_DEFAULT_SETTINGS = SKL_CULL_MODE_BACK
 }sklPipelineSettingFlagBits;
 
-namespace skeleton
-{
 struct shader_t
 {
 	shader_t(const char* _name) :
@@ -114,6 +112,5 @@ void CreateDescriptorSetLayout(
 size_t PadBufferDataForShader(
 	size_t _original);
 
-} // namespace skeleton
 #endif // !PARPROGS_H
 

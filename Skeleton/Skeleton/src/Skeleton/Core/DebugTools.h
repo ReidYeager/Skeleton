@@ -4,9 +4,6 @@
 
 #include "vulkan/vulkan.h"
 
-namespace skeleton
-{
-
 #define SKL_DEBUG "SKL_DEBUG"
 #define SKL_ERROR "SKL_ERROR"
 #define SKL_ERROR_VK "SKL_ERROR_VK"
@@ -98,9 +95,7 @@ inline const char* VulkanResultToString(
 	if (vkAssertResult != VK_SUCCESS)							\
 	{															\
 		SKL_PRINT(SKL_ERROR_VK, errorMessage, __VA_ARGS__);		\
-		throw skeleton::VulkanResultToString(vkAssertResult);	\
+		throw VulkanResultToString(vkAssertResult);	\
 	}															\
 }
-
-} // namespace skeleton
 

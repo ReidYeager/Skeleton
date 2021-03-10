@@ -3,8 +3,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
-namespace skeleton
-{
 struct Transform
 {
 	glm::vec3 position;
@@ -16,5 +14,4 @@ struct Transform
 		return glm::mat4_cast(glm::radians(eulerAngles));
 	}
 };
-} // namespace skeleton
 

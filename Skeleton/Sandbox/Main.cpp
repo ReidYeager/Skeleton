@@ -6,7 +6,7 @@
 // TODO : Implement shader layout file handling
 // TODO : Define shader files/directory
 
-class sandboxApp : public skeleton::Application
+class sandboxApp : public Application
 {
 public:
 	void Init()
@@ -16,14 +16,12 @@ public:
 		renderer->CreateRenderer();
 		renderer->CreateModelBuffers();
 
-		uint32_t i = skeleton::GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
-		uint32_t j = skeleton::GetProgram("blue", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_BACK);
+		uint32_t i = GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
+		uint32_t j = GetProgram("blue", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_BACK);
 		CreateObject("./res/models/SphereSmooth.obj", j);
 		CreateObject("./res/models/SphereSmooth.obj", i);
 		CreateObject("./res/models/Cube.obj", i);
 
-
-		//renderer->CreateDescriptorSet(vulkanContext.parProgs[i], );
 		renderer->RecordCommandBuffers();
 	}
 

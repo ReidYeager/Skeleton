@@ -28,7 +28,7 @@ struct sklImage_t
 
 struct sklRenderable_t
 {
-	skeleton::mesh_t mesh;
+	mesh_t mesh;
 	uint32_t parProgIndex;
 	std::vector<sklBuffer_t*> buffers;
 	std::vector<sklImage_t*> images;
@@ -63,8 +63,8 @@ struct SklVulkanContext_t
 	VkQueue presentQueue;
 	VkQueue transferQueue;
 
-	std::vector<skeleton::shader_t> shaders;
-	std::vector<skeleton::parProg_t> parProgs;
+	std::vector<shader_t> shaders;
+	std::vector<parProg_t> parProgs;
 
 	VkExtent2D renderExtent;
 	VkRenderPass renderPass;
@@ -185,84 +185,131 @@ inline void CreateLogicalDevice(
 	//CreateCommandPool(transientPool, queueIndices.transfer, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
 }
 
-class RenderBackend
-{
-
-};
-
 // TODO : Better handle buffer memory
-namespace skeleton
+class BufferManager
 {
-	class BufferManager
+	//=================================================
+	// Variables
+	//=================================================
+private:
+	// TODO : Upgrade this to allow more buffers
+	uint64_t m_indexBitMap = 0;
+	#define INDEXBITMAPSIZE 64
+	std::vector<VkBuffer> m_buffers;
+	std::vector<VkDeviceMemory> m_memories;
+
+public:
+	VkCommandPool transientPool;
+
+	//=================================================
+	// Functions
+	//=================================================
+public:
+	BufferManager()
 	{
-		//=================================================
-		// Variables
-		//=================================================
-	private:
-		// TODO : Upgrade this to allow more buffers
-		uint64_t m_indexBitMap = 0;
-		#define INDEXBITMAPSIZE 64
-		std::vector<VkBuffer> m_buffers;
-		std::vector<VkDeviceMemory> m_memories;
+		CreateCommandPool(transientPool, vulkanContext.transferIdx);
+	}
+	~BufferManager();
 
-	public:
-		VkCommandPool transientPool;
+	bool GetIndexBitMapAt(uint32_t _index);
+	void SetIndexBitMapAt(uint32_t _index, bool _value = true);
 
-		//=================================================
-		// Functions
-		//=================================================
-	public:
-		BufferManager()
+	uint32_t GetBufferCount() { return static_cast<uint32_t>(m_buffers.size()); }
+
+	const VkBuffer* GetBuffer(uint32_t _index);
+	const VkDeviceMemory* GetMemory(uint32_t _index);
+	void RemoveAtIndex(uint32_t _index);
+	uint32_t GetFirstAvailableIndex();
+
+	uint32_t CreateAndFillBuffer(
+		VkBuffer& _buffer,
+		VkDeviceMemory& _memory,
+		const void* _data,
+		VkDeviceSize size,
+		VkBufferUsageFlags _usage);
+
+	uint32_t CreateBuffer(
+		VkBuffer& _buffer,
+		VkDeviceMemory& _memory,
+		VkDeviceSize _size,
+		VkBufferUsageFlags _usage,
+		VkMemoryPropertyFlags _memProperties);
+
+	uint32_t CreateBuffer(
+		VkDeviceSize _size,
+		VkBufferUsageFlags _usage,
+		VkMemoryPropertyFlags _memProperties);
+
+	void FillBuffer(
+		VkDeviceMemory& memory,
+		const void* _data,
+		VkDeviceSize _size);
+
+	void CopyBuffer(
+		VkBuffer _src,
+		VkBuffer _dst,
+		VkDeviceSize _size);
+
+	uint32_t FindMemoryType(
+		uint32_t _mask,
+		VkMemoryPropertyFlags _flags);
+
+}; // BufferManager
+
+
+#include "sdl/SDL.h"
+#include "sdl/SDL_vulkan.h"
+// Initialization and drawing
+class SklRendererBackend
+{
+private:
+	std::vector<const char*> validationLayer = { "VK_LAYER_KHRONOS_validation" };
+	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
+	std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+public:
+	// TODO : Find a way to remove SDL window from Create(instance/swapchain)
+	SDL_Window* window;
+
+	VkInstance instance;
+	VkSurfaceKHR surface;
+
+public:
+	SklRendererBackend(
+		SDL_Window* _window,
+		const std::vector<const char*>& _extraExtensions) : window(_window)
+	{
+		// Include the extra extensions specified
+		for (const char* additionalExtension : _extraExtensions)
 		{
-			CreateCommandPool(transientPool, vulkanContext.transferIdx);
+			instanceExtensions.push_back(additionalExtension);
 		}
-		~BufferManager();
+	}
 
-		bool GetIndexBitMapAt(uint32_t _index);
-		void SetIndexBitMapAt(uint32_t _index, bool _value = true);
+	// Creates the vkInstance & vkSurface
+	void CreateInstance();
+	// Gets a physical device & creates the vkDevice
+	void CreateDevice();
+	// Determines the best physical device for rendering
+	void ChoosePhysicalDevice(
+		VkPhysicalDevice& _selectedDevice,
+		uint32_t& _graphicsIndex,
+		uint32_t& _presentIndex,
+		uint32_t& _transferIndex);
 
-		uint32_t GetBufferCount() { return static_cast<uint32_t>(m_buffers.size()); }
+	// Helpers
+	//=================================================
+	// Returns the first instance of a queue with the input flags
+	uint32_t GetQueueIndex(
+		std::vector<VkQueueFamilyProperties>& _queues,
+		VkQueueFlags _flags);
 
-		const VkBuffer* GetBuffer(uint32_t _index);
-		const VkDeviceMemory* GetMemory(uint32_t _index);
-		void RemoveAtIndex(uint32_t _index);
-		uint32_t GetFirstAvailableIndex();
-
-		uint32_t CreateAndFillBuffer(
-			VkBuffer& _buffer,
-			VkDeviceMemory& _memory,
-			const void* _data,
-			VkDeviceSize size,
-			VkBufferUsageFlags _usage);
-
-		uint32_t CreateBuffer(
-			VkBuffer& _buffer,
-			VkDeviceMemory& _memory,
-			VkDeviceSize _size,
-			VkBufferUsageFlags _usage,
-			VkMemoryPropertyFlags _memProperties);
-
-		uint32_t CreateBuffer(
-			VkDeviceSize _size,
-			VkBufferUsageFlags _usage,
-			VkMemoryPropertyFlags _memProperties);
-
-		void FillBuffer(
-			VkDeviceMemory& memory,
-			const void* _data,
-			VkDeviceSize _size);
-
-		void CopyBuffer(
-			VkBuffer _src,
-			VkBuffer _dst,
-			VkDeviceSize _size);
-
-		uint32_t FindMemoryType(
-			uint32_t _mask,
-			VkMemoryPropertyFlags _flags);
-
-	}; // BufferManager
-} // namespace skeleton
+	// Returns the first instance of a presentation queue
+	uint32_t GetPresentIndex(
+		const VkPhysicalDevice* _device,
+		uint32_t _queuePropertyCount,
+		uint32_t _graphicsIndex);
+};
 
 #endif // RENDERER_BACKEND_H
 

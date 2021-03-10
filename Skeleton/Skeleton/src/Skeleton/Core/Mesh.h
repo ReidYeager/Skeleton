@@ -3,12 +3,9 @@
 #include <vector>
 #include "Skeleton/Core/Vertex.h"
 
-namespace skeleton
-{
-
 struct mesh_t
 {
-	std::vector<skeleton::vertex_t> verticies;
+	std::vector<vertex_t> verticies;
 	std::vector<uint32_t> indices;
 
 	VkBuffer vertexBuffer;
@@ -25,5 +22,4 @@ struct mesh_t
 	}
 };
 
-} // namespace skeleton
 

@@ -2,8 +2,6 @@
 
 #include "glm/glm.hpp"
 
-namespace skeleton
-{
 class Camera
 {
 //=================================================
@@ -43,5 +41,4 @@ public:
 	glm::vec3 GetRight() { return glm::normalize(glm::cross(forward, {0.f, 1.f, 0.f})); }
 
 }; // Camera
-} // namespace Skeleton
 

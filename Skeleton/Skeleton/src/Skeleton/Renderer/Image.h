@@ -2,14 +2,11 @@
 
 #include "vulkan/vulkan.h"
 
-namespace skeleton
+struct ImageInfo
 {
-	struct ImageInfo
-	{
-		VkImage			image;
-		VkDeviceMemory	memory;
-		VkImageView		view;
-		VkSampler		sampler;
-	};
-} // namespace skeleton
+	VkImage			image;
+	VkDeviceMemory	memory;
+	VkImageView		view;
+	VkSampler		sampler;
+};
 

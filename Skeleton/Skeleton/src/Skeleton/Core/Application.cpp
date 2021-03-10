@@ -7,7 +7,7 @@
 #include "Skeleton/Core/Application.h"
 #include "Skeleton/Core/FileSystem.h"
 
-void skeleton::Application::Init()
+void Application::Init()
 {
 	SKL_PRINT("Application", "Init =================================================");
 	// Create window
@@ -40,20 +40,20 @@ void skeleton::Application::Init()
 	renderer = new Renderer(sdlExtensions, window);
 }
 
-void skeleton::Application::Run()
+void Application::Run()
 {
 	SKL_PRINT("Application", "Run =================================================");
 	MainLoop();
 }
 
-void skeleton::Application::Cleanup()
+void Application::Cleanup()
 {
 	SKL_PRINT("Application", "Cleanup =================================================");
 	delete(renderer);
 	SDL_DestroyWindow(window);
 }
 
-void skeleton::Application::MainLoop()
+void Application::MainLoop()
 {
 	static SDL_Event e;
 	auto startTime = std::chrono::high_resolution_clock::now();
@@ -122,12 +122,12 @@ void skeleton::Application::MainLoop()
 	}
 }
 
-void skeleton::Application::DefineShaders()
+void Application::DefineShaders()
 {
 	
 }
 
-void skeleton::Application::CreateObject(
+void Application::CreateObject(
 	const char* _meshDirectory,
 	uint32_t _parProgIndex)
 {
@@ -135,13 +135,13 @@ void skeleton::Application::CreateObject(
 	renderer->CreateDescriptorSet(vulkanContext.parProgs[_parProgIndex], vulkanContext.renderables[vulkanContext.renderables.size() - 1]);
 }
 
-skeleton::mesh_t skeleton::Application::CreateMesh(
+mesh_t Application::CreateMesh(
 	const char* _directory)
 {
-	return skeleton::tools::LoadMesh(_directory, renderer->bufferManager);
+	return LoadMesh(_directory, renderer->bufferManager);
 }
 
-sklRenderable_t skeleton::Application::CreateRenderable(
+sklRenderable_t Application::CreateRenderable(
 	mesh_t _mesh,
 	uint32_t _parProgIndex)
 {

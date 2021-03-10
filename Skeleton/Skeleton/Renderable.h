@@ -5,8 +5,6 @@
 #include "vulkan/vulkan.h"
 #include "Skeleton/Renderer/Image.h"
 
-namespace skeleton
-{
 class Renderable
 {
 //=================================================
@@ -14,7 +12,7 @@ class Renderable
 //=================================================
 public:
 	std::vector<VkBuffer> buffers;
-	std::vector<skeleton::ImageInfo> images;
+	std::vector<ImageInfo> images;
 
 
 //=================================================
@@ -24,5 +22,4 @@ public:
 	
 
 };
-} // namespace skeleton
 

@@ -8,25 +8,16 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-#include "Skeleton/Renderer/RenderBackend.h"
+#include "Skeleton/Renderer/RendererBackend.h"
 #include "Skeleton/Core/Camera.h"
 
-namespace skeleton
-{
 class Renderer
 {
 //=================================================
 // Variables
 //=================================================
 public:
-	// TODO : Find a way to remove SDL window from Create(instance/swapchain)
-	SDL_Window* window;
-
-	VkInstance instance;
-	VkSurfaceKHR surface;
-	std::vector<const char*> validationLayer    = { "VK_LAYER_KHRONOS_validation" };
-	std::vector<const char*> instanceExtensions = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
-	std::vector<const char*> deviceExtensions   = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	SklRendererBackend* backend;
 	BufferManager* bufferManager;
 
 	VkCommandPool graphicsPool;
@@ -35,16 +26,6 @@ public:
 	VkSwapchainKHR swapchain;
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
-
-	VkImage textureImage;
-	VkDeviceMemory textureMemory;
-	VkImageView textureImageView;
-	VkSampler textureSampler;
-
-	VkImage alttextureImage;
-	VkDeviceMemory alttextureMemory;
-	VkImageView alttextureImageView;
-	VkSampler alttextureSampler;
 
 	VkImage depthImage;
 	VkDeviceMemory depthMemory;
@@ -124,16 +105,6 @@ protected:
 
 	// Pre-renderer creation
 
-	// Creates the vkInstance & vkSurface
-	void CreateInstance();
-	// Gets a physical device & creates the vkDevice
-	void CreateDevice();
-	// Determines the best physical device for rendering
-	void ChoosePhysicalDevice(
-		VkPhysicalDevice& _selectedDevice,
-		uint32_t& _graphicsIndex,
-		uint32_t& _presentIndex,
-		uint32_t& _transferIndex);
 	void CreateCommandPools();
 
 	// Post-renderer creation
@@ -151,17 +122,6 @@ protected:
 
 	// Helpers
 	//=================================================
-
-	// Returns the first instance of a queue with the input flags
-	uint32_t GetQueueIndex(
-		std::vector<VkQueueFamilyProperties>& _queues,
-		VkQueueFlags _flags);
-
-	// Returns the first instance of a presentation queue
-	uint32_t GetPresentIndex(
-		const VkPhysicalDevice* _device,
-		uint32_t _queuePropertyCount,
-		uint32_t _graphicsIndex);
 
 	VkImageView CreateImageView(
 		const VkFormat _format,
@@ -207,5 +167,4 @@ protected:
 		VkFormatFeatureFlags _features);
 
 }; // Renderer
-} // namespace skeleton
 

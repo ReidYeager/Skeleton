@@ -203,7 +203,7 @@
     <ClInclude Include="src\Skeleton\Renderer\ParProgs.h" />
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
     <ClInclude Include="src\Skeleton.h" />
-    <ClInclude Include="src\Skeleton\Renderer\RenderBackend.h" />
+    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Renderable.cpp" />
@@ -216,7 +216,7 @@
     <ClCompile Include="src\Skeleton\Core\Application.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp" />
     <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\RenderBackend.cpp" />
+    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

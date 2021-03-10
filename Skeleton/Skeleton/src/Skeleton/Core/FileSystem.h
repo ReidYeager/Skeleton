@@ -11,10 +11,7 @@
 #include "tinyobjloader/tiny_obj_loader.h"
 
 #include "Common.h"
-#include "Skeleton/Renderer/RenderBackend.h"
-
-namespace skeleton::tools
-{
+#include "Skeleton/Renderer/RendererBackend.h"
 
 inline std::vector<char> LoadFile(
 	const char* _directory)
@@ -122,5 +119,4 @@ inline mesh_t LoadMesh(
 	return mesh;
 }
 
-} // namespace skeleton
 

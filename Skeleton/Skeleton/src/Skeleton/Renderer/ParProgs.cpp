@@ -1,13 +1,13 @@
 
 #include "pch.h"
 #include "Skeleton/Renderer/ParProgs.h"
-#include "Skeleton/Renderer/RenderBackend.h"
+#include "Skeleton/Renderer/RendererBackend.h"
 #include "Skeleton/Core/FileSystem.h"
 #include "Skeleton/Core/Vertex.h"
 
 #include <string>
 
-VkPipeline skeleton::parProg_t::GetPipeline(
+VkPipeline parProg_t::GetPipeline(
 	VkShaderModule _vertMod,
 	VkShaderModule _fragMod)
 {
@@ -24,7 +24,7 @@ VkPipeline skeleton::parProg_t::GetPipeline(
 	return pipeline;
 }
 
-uint32_t skeleton::GetProgram(
+uint32_t GetProgram(
 	const char* _name,
 	sklShaderStageFlags _stages,
 	uint64_t _pipelineSettings /*= 1*/)
@@ -45,7 +45,7 @@ uint32_t skeleton::GetProgram(
 	return i;
 }
 
-void skeleton::CreateProgram(
+void CreateProgram(
 	const char* _name,
 	sklShaderStageFlags _stages,
 	uint64_t _pipelineSettings /*= 1*/)
@@ -55,24 +55,24 @@ void skeleton::CreateProgram(
 	uint32_t vertIdx = -1;
 	if (_stages & SKL_SHADER_VERT_STAGE)
 	{
-		vertIdx = skeleton::GetShader(_name, SKL_SHADER_VERT_STAGE);
+		vertIdx = GetShader(_name, SKL_SHADER_VERT_STAGE);
 	}
 
 	uint32_t fragIdx = -1;
 	if (_stages & SKL_SHADER_FRAG_STAGE)
 	{
-		fragIdx = skeleton::GetShader(_name, SKL_SHADER_FRAG_STAGE);
+		fragIdx = GetShader(_name, SKL_SHADER_FRAG_STAGE);
 	}
 
-	skeleton::parProg_t prog(_name);
+	parProg_t prog(_name);
 	prog.pipelineSettings = _pipelineSettings;
 	prog.vertIdx = vertIdx;
 	prog.fragIdx = fragIdx;
-	skeleton::CreateDescriptorSetLayout(prog);
+	CreateDescriptorSetLayout(prog);
 	vulkanContext.parProgs.push_back(prog);
 }
 
-VkPipeline skeleton::CreatePipeline(
+VkPipeline CreatePipeline(
 	VkShaderModule _vertModule,
 	VkShaderModule _fragModule,
 	VkPipelineLayout _pipeLayout,
@@ -101,8 +101,8 @@ VkPipeline skeleton::CreatePipeline(
 
 	// Vert Input State
 	//=================================================
-	const auto vertexInputBindingDesc = skeleton::vertex_t::GetBindingDescription();
-	const auto vertexInputAttribDescs = skeleton::vertex_t::GetAttributeDescriptions();
+	const auto vertexInputBindingDesc = vertex_t::GetBindingDescription();
+	const auto vertexInputAttribDescs = vertex_t::GetAttributeDescriptions();
 
 	VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {};
 	vertexInputStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -221,7 +221,7 @@ VkPipeline skeleton::CreatePipeline(
 	return tmpPipeline;
 }
 
-uint32_t skeleton::GetShader(const char* _name, sklShaderStageFlags _stage)
+uint32_t GetShader(const char* _name, sklShaderStageFlags _stage)
 {
 	for (uint32_t i = 0; i < vulkanContext.shaders.size(); i++)
 	{
@@ -242,13 +242,13 @@ uint32_t skeleton::GetShader(const char* _name, sklShaderStageFlags _stage)
 	return index;
 }
 
-void skeleton::LoadShader(uint32_t _index)
+void LoadShader(uint32_t _index)
 {
 	if (vulkanContext.shaders[_index].module == VK_NULL_HANDLE)
-		skeleton::LoadShader(vulkanContext.shaders[_index]);
+		LoadShader(vulkanContext.shaders[_index]);
 }
 
-void skeleton::LoadShader(shader_t& _shader)
+void LoadShader(shader_t& _shader)
 {
 	std::string shaderDirectory = "res\\Shaders\\";
 	shaderDirectory.append(_shader.name);
@@ -272,7 +272,7 @@ void skeleton::LoadShader(shader_t& _shader)
 
 	// Shader
 	//=================================================
-	std::vector<char> shaderSource = skeleton::tools::LoadFile(shaderDirectory.c_str());
+	std::vector<char> shaderSource = LoadFile(shaderDirectory.c_str());
 	VkShaderModuleCreateInfo moduleCreateInfo = {};
 	moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	moduleCreateInfo.codeSize = shaderSource.size();
@@ -284,7 +284,7 @@ void skeleton::LoadShader(shader_t& _shader)
 
 	// Layout
 	//=================================================
-	std::vector<char> layoutSource = skeleton::tools::LoadFile(layoutDirectory.c_str());
+	std::vector<char> layoutSource = LoadFile(layoutDirectory.c_str());
 	//SKL_PRINT("Layout", "\n:--:%s\n:--:%s", layoutDirectory.c_str(), layoutSource.data());
 
 	std::string layout(layoutSource.data());
@@ -309,7 +309,7 @@ void skeleton::LoadShader(shader_t& _shader)
 	}
 }
 
-void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
+void CreateDescriptorSetLayout(parProg_t& _program)
 {
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
 	VkDescriptorSetLayoutBinding binding = {};
@@ -321,7 +321,7 @@ void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 	binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	if (_program.vertIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_program.vertIdx];
+		shader_t& shader = vulkanContext.shaders[_program.vertIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -341,7 +341,7 @@ void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 	binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	if (_program.fragIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_program.fragIdx];
+		shader_t& shader = vulkanContext.shaders[_program.fragIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -361,7 +361,7 @@ void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 	binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 	if (_program.compIdx != -1)
 	{
-		skeleton::shader_t& shader = vulkanContext.shaders[_program.compIdx];
+		shader_t& shader = vulkanContext.shaders[_program.compIdx];
 
 		for (uint32_t i = 0; i < shader.bindings.size(); i++)
 		{
@@ -401,7 +401,7 @@ void skeleton::CreateDescriptorSetLayout(parProg_t& _program)
 		"Failed to create pipeline layout");
 }
 
-size_t skeleton::PadBufferDataForShader(
+size_t PadBufferDataForShader(
 	size_t _original)
 {
 	size_t alignment = vulkanContext.gpu.properties.limits.minUniformBufferOffsetAlignment;

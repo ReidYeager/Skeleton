@@ -5,8 +5,6 @@
 
 #include "Skeleton/Renderer/Renderer.h"
 
-namespace skeleton
-{
 class Application
 {
 //////////////////////////////////////////////////////////////////////////
@@ -14,7 +12,7 @@ class Application
 //////////////////////////////////////////////////////////////////////////
 protected:
 	SDL_Window* window;
-	skeleton::Renderer* renderer;
+	Renderer* renderer;
 
 	struct MVPMatrices {
 		glm::mat4 model;
@@ -47,5 +45,4 @@ protected:
 		uint32_t _shaderIndex);
 
 }; // Application
-} // namespace skeleton
 

@@ -2,18 +2,16 @@
 	 TODO :--: Line     5 :--: // TODO : Implement shader layout file handling
 	 TODO :--: Line     6 :--: // TODO : Define shader files/directory
 \Skeleton\Skeleton\src\Skeleton\Core\Vertex.h
-	 TODO :--: Line    67 :--: // TODO : Make a better hash function http://www.azillionmonkeys.com/qed/hash.html
+	 TODO :--: Line    62 :--: // TODO : Make a better hash function http://www.azillionmonkeys.com/qed/hash.html
 \Skeleton\Skeleton\src\Skeleton\Renderer\ParProgs.h
 	 TODO :--: Line    32 :--: // TODO : Implement options for all pipeline settings
-\Skeleton\Skeleton\src\Skeleton\Renderer\RenderBackend.h
+\Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.cpp
+	 TODO :--: Line   231 :--: // TODO : Move camera to Application
+	 TODO :--: Line   560 :--: // TODO : Only bind pipelines once
+	 TODO :--: Line   761 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
+\Skeleton\Skeleton\src\Skeleton\Renderer\RendererBackend.h
 	 TODO :--: Line     9 :--: // TODO : Clean this file up
 	 TODO :--: Line    35 :--: // TODO : Create buffer/image function
-	 TODO :--: Line   192 :--: // TODO : Better handle buffer memory
-	 TODO :--: Line   201 :--: // TODO : Upgrade this to allow more buffers
-\Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.cpp
-	 TODO :--: Line   123 :--: // TODO : Make this dynamic alongside DescriptorLayout.
-	 TODO :--: Line   237 :--: // TODO : Move camera to Application
-	 TODO :--: Line   761 :--: // TODO : Only bind pipelines once
-	 TODO :--: Line  1024 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
-\Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.h
-	 TODO :--: Line    21 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)
+	 TODO :--: Line   187 :--: // TODO : Better handle buffer memory
+	 TODO :--: Line   194 :--: // TODO : Upgrade this to allow more buffers
+	 TODO :--: Line   270 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)

@@ -8,7 +8,7 @@
 #include "stb/stb_image.h"
 
 #include "Renderer.h"
-#include "RenderBackend.h"
+#include "RendererBackend.h"
 #include "Skeleton/Core/Common.h"
 #include "Skeleton/Core/FileSystem.h"
 #include "Skeleton/Core/Vertex.h"
@@ -20,24 +20,19 @@
 //=================================================
 
 // Initializes the renderer in its entirety
-skeleton::Renderer::Renderer(
+Renderer::Renderer(
 	const std::vector<const char*>& _extraExtensions,
-	SDL_Window* _window) : window(_window)
+	SDL_Window* _window)
 {
-	// Include the extra extensions specified
-	for (const char* additionalExtension : _extraExtensions)
-	{
-		instanceExtensions.push_back(additionalExtension);
-	}
-
-	CreateInstance();
-	CreateDevice();
+	backend = new SklRendererBackend(_window, _extraExtensions);
+	backend->CreateInstance();
+	backend->CreateDevice();
 	bufferManager = new BufferManager();
 	CreateCommandPools();
 }
 
 // Cleans up all vulkan objects
-skeleton::Renderer::~Renderer()
+Renderer::~Renderer()
 {
 	vkDeviceWaitIdle(vulkanContext.device);
 
@@ -50,15 +45,15 @@ skeleton::Renderer::~Renderer()
 
 	delete(bufferManager);
 	vulkanContext.Cleanup();
-	vkDestroySurfaceKHR(instance, surface, nullptr);
-	vkDestroyInstance(instance, nullptr);
+	vkDestroySurfaceKHR(backend->instance, backend->surface, nullptr);
+	vkDestroyInstance(backend->instance, nullptr);
 }
 
 //=================================================
 // RenderFrame
 //=================================================
 
-void skeleton::Renderer::RenderFrame()
+void Renderer::RenderFrame()
 {
 	vkWaitForFences(vulkanContext.device, 1, &flightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -102,7 +97,7 @@ void skeleton::Renderer::RenderFrame()
 	currentFrame = (currentFrame + 1) % MAX_FLIGHT_IMAGE_COUNT;
 }
 
-void skeleton::Renderer::CreateDescriptorPool()
+void Renderer::CreateDescriptorPool()
 {
 	VkDescriptorPoolSize poolSizes[2] = {};
 	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -121,8 +116,7 @@ void skeleton::Renderer::CreateDescriptorPool()
 		"Failed to create descriptor pool");
 }
 
-// TODO : Make this dynamic alongside DescriptorLayout.
-void skeleton::Renderer::CreateDescriptorSet(
+void Renderer::CreateDescriptorSet(
 	parProg_t& _prog,
 	sklRenderable_t& _renderable)
 {
@@ -226,7 +220,7 @@ void skeleton::Renderer::CreateDescriptorSet(
 // CreateRenderer
 //=================================================
 
-void skeleton::Renderer::CreateRenderer()
+void Renderer::CreateRenderer()
 {
 	CreateSwapchain();
 	CreateRenderpass();
@@ -240,19 +234,6 @@ void skeleton::Renderer::CreateRenderer()
 	cam.position.z = 3;
 	cam.UpdateProjection(vulkanContext.renderExtent.width / float(vulkanContext.renderExtent.height));
 
-	CreateTextureImage(
-		"res/TestImage.png",
-		textureImage,
-		textureImageView,
-		textureMemory,
-		textureSampler);
-
-	CreateTextureImage(
-		"res/AltImage.png",
-		alttextureImage,
-		alttextureImageView,
-		alttextureMemory,
-		alttextureSampler);
 	//CreateModelBuffers();
 	CreateDescriptorPool();
 	//CreateDescriptorSet(vulkanContext.parProgs[0]);
@@ -261,18 +242,8 @@ void skeleton::Renderer::CreateRenderer()
 	//RecordCommandBuffers();
 }
 
-void skeleton::Renderer::CleanupRenderer()
+void Renderer::CleanupRenderer()
 {
-	vkFreeMemory(vulkanContext.device, textureMemory, nullptr);
-	vkDestroySampler(vulkanContext.device, textureSampler, nullptr);
-	vkDestroyImageView(vulkanContext.device, textureImageView, nullptr);
-	vkDestroyImage(vulkanContext.device, textureImage, nullptr);
-
-	vkFreeMemory(vulkanContext.device, alttextureMemory, nullptr);
-	vkDestroySampler(vulkanContext.device, alttextureSampler, nullptr);
-	vkDestroyImageView(vulkanContext.device, alttextureImageView, nullptr);
-	vkDestroyImage(vulkanContext.device, alttextureImage, nullptr);
-
 	for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
 	{
 		vkDestroyFence(vulkanContext.device, flightFences[i], nullptr);
@@ -305,7 +276,7 @@ void skeleton::Renderer::CleanupRenderer()
 	vkDestroySwapchainKHR(vulkanContext.device, swapchain, nullptr);
 }
 
-void skeleton::Renderer::RecreateRenderer()
+void Renderer::RecreateRenderer()
 {
 	vkDeviceWaitIdle(vulkanContext.device);
 	CleanupRenderer();
@@ -316,184 +287,12 @@ void skeleton::Renderer::RecreateRenderer()
 // Initialization
 //=================================================
 
-// Creates the vkInstance & vkSurface
-void skeleton::Renderer::CreateInstance()
-{
-	// Basic application metadata
-	VkApplicationInfo appInfo = {};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.apiVersion = VK_API_VERSION_1_2;
-	appInfo.pEngineName = "Skeleton Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(0, 0, 1);
-	appInfo.pApplicationName = "Test Skeleton Application";
-	appInfo.applicationVersion = VK_MAKE_VERSION(0, 0, 0);
-
-	// Create the instance
-	VkInstanceCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
-	createInfo.ppEnabledExtensionNames = instanceExtensions.data();
-	createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayer.size());
-	createInfo.ppEnabledLayerNames = validationLayer.data();
-
-	SKL_ASSERT_VK(
-		vkCreateInstance(&createInfo, nullptr, &instance),
-		"Failed to create vkInstance");
-
-	// Create the surface
-	SDL_Vulkan_CreateSurface(window, instance, &surface);
-}
-
-// Gets a physical device & creates the vkDevice
-void skeleton::Renderer::CreateDevice()
-{
-	// Select a physical device
-	uint32_t queueIndices[3];
-	VkPhysicalDevice physicalDevice;
-	ChoosePhysicalDevice(physicalDevice, queueIndices[0], queueIndices[1], queueIndices[2]);
-
-	SKL_PRINT(
-		SKL_DEBUG,
-		"Queue indices :--: Graphics: %u :--: Present: %u :--: Transfer: %u",
-		queueIndices[0],
-		queueIndices[1],
-		queueIndices[2]);
-
-	vulkanContext.gpu.device = physicalDevice;
-
-	vulkanContext.graphicsIdx = queueIndices[0];
-	vulkanContext.presentIdx  = queueIndices[1];
-	vulkanContext.transferIdx = queueIndices[2];
-
-	CreateLogicalDevice(
-		{queueIndices[0], queueIndices[1], queueIndices[2]},
-		deviceExtensions,
-		validationLayer);
-
-	// Fill GPU details
-	VkPhysicalDevice& pysDevice = vulkanContext.gpu.device;
-	SklPhysicalDeviceInfo_t& pdInfo = vulkanContext.gpu;
-
-	uint32_t propertyCount;
-	vkGetPhysicalDeviceQueueFamilyProperties(pysDevice, &propertyCount, nullptr);
-	pdInfo.queueFamilyProperties.resize(propertyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(pysDevice, &propertyCount, pdInfo.queueFamilyProperties.data());
-
-	vkGetPhysicalDeviceProperties(pysDevice, &pdInfo.properties);
-
-	uint32_t extensionCount;
-	vkEnumerateDeviceExtensionProperties(pysDevice, nullptr, &extensionCount, nullptr);
-	pdInfo.extensionProperties.resize(extensionCount);
-	vkEnumerateDeviceExtensionProperties(pysDevice, nullptr, &extensionCount, pdInfo.extensionProperties.data());
-
-	vkGetPhysicalDeviceFeatures(pysDevice, &pdInfo.features);
-	vkGetPhysicalDeviceMemoryProperties(pysDevice, &pdInfo.memProperties);
-
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(pysDevice, surface, &presentModeCount, nullptr);
-	pdInfo.presentModes.resize(presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(pysDevice, surface, &presentModeCount, pdInfo.presentModes.data());
-
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pysDevice, surface, &pdInfo.surfaceCapabilities);
-
-	uint32_t surfaceFormatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(pysDevice, surface, &surfaceFormatCount, nullptr);
-	pdInfo.surfaceFormats.resize(surfaceFormatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(pysDevice, surface, &surfaceFormatCount, pdInfo.surfaceFormats.data());
-}
-
-// Determines the best physical device for rendering
-void skeleton::Renderer::ChoosePhysicalDevice(
-	VkPhysicalDevice& _selectedDevice,
-	uint32_t& _graphicsIndex,
-	uint32_t& _presentIndex,
-	uint32_t& _transferIndex)
-{
-	// Get all available physical devices
-	uint32_t deviceCount;
-	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-	std::vector<VkPhysicalDevice> physDevices(deviceCount);
-	vkEnumeratePhysicalDevices(instance, &deviceCount, physDevices.data());
-
-	uint32_t propertyCount;
-
-	struct BestGPU
-	{
-		VkPhysicalDevice device;
-		uint32_t graphicsIndex;
-		uint32_t presentIndex;
-		uint32_t transferIndex;
-	} bestFit;
-
-	for (const auto& pdevice : physDevices)
-	{
-		vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &propertyCount, nullptr);
-		std::vector<VkQueueFamilyProperties> queueProperties(propertyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &propertyCount, queueProperties.data());
-
-		VkPhysicalDeviceProperties props;
-		vkGetPhysicalDeviceProperties(pdevice, &props);
-
-		uint32_t extensionCount;
-		vkEnumerateDeviceExtensionProperties(pdevice, nullptr, &extensionCount, nullptr);
-		std::vector<VkExtensionProperties> physicalDeviceExt(extensionCount);
-		vkEnumerateDeviceExtensionProperties(pdevice, nullptr, &extensionCount, physicalDeviceExt.data());
-
-		std::set<std::string> requiredExtensionSet(deviceExtensions.begin(), deviceExtensions.end());
-
-		VkPhysicalDeviceFeatures features;
-		vkGetPhysicalDeviceFeatures(pdevice, &features);
-
-		for (const auto& ext : physicalDeviceExt)
-		{
-			requiredExtensionSet.erase(ext.extensionName);
-		}
-
-		_graphicsIndex = GetQueueIndex(queueProperties, VK_QUEUE_GRAPHICS_BIT);
-		_transferIndex = GetQueueIndex(queueProperties, VK_QUEUE_TRANSFER_BIT);
-		_presentIndex = GetPresentIndex(&pdevice, propertyCount, _graphicsIndex);
-
-		if (
-			features.samplerAnisotropy &&
-			requiredExtensionSet.empty() &&
-			_graphicsIndex != -1 &&
-			_presentIndex != -1 &&
-			_transferIndex != -1)
-		{
-			if (_graphicsIndex == _presentIndex || _graphicsIndex == _transferIndex || _presentIndex == _transferIndex)
-			{
-				bestFit.device = pdevice;
-				bestFit.graphicsIndex = _graphicsIndex;
-				bestFit.presentIndex = _presentIndex;
-				bestFit.transferIndex = _transferIndex;
-			}
-			else
-			{
-				_selectedDevice = pdevice;
-				return;
-			}
-		}
-	}
-
-	if (bestFit.device != VK_NULL_HANDLE)
-	{
-		_selectedDevice = bestFit.device;
-		_graphicsIndex = bestFit.graphicsIndex;
-		_presentIndex = bestFit.presentIndex;
-		_transferIndex = bestFit.transferIndex;
-		return;
-	}
-
-	SKL_ASSERT_VK(VK_ERROR_UNKNOWN, "Failed to find a suitable physical device");
-}
-
-void skeleton::Renderer::CreateCommandPools()
+void Renderer::CreateCommandPools()
 {
 	CreateCommandPool(graphicsPool, vulkanContext.graphicsIdx);
 }
 
-void skeleton::Renderer::CreateSyncObjects()
+void Renderer::CreateSyncObjects()
 {
 	imageIsInFlightFences.resize(swapchainImages.size(), VK_NULL_HANDLE);
 	flightFences.resize(MAX_FLIGHT_IMAGE_COUNT);
@@ -521,7 +320,7 @@ void skeleton::Renderer::CreateSyncObjects()
 	}
 }
 
-void skeleton::Renderer::CreateCommandBuffers()
+void Renderer::CreateCommandBuffers()
 {
 	uint32_t bufferCount = static_cast<uint32_t>(swapchainImages.size());
 	commandBuffers.resize(bufferCount);
@@ -541,7 +340,7 @@ void skeleton::Renderer::CreateCommandBuffers()
 // CreateRenderer Functions
 //=================================================
 
-void skeleton::Renderer::CreateSwapchain()
+void Renderer::CreateSwapchain()
 {
 	// Find the best surface format
 	VkSurfaceFormatKHR formatInfo = vulkanContext.gpu.surfaceFormats[0];
@@ -575,7 +374,7 @@ void skeleton::Renderer::CreateSwapchain()
 	else
 	{
 		uint32_t width, height;
-		SDL_GetWindowSize(window, reinterpret_cast<int*>(&width), reinterpret_cast<int*>(&height));
+		SDL_GetWindowSize(backend->window, reinterpret_cast<int*>(&width), reinterpret_cast<int*>(&height));
 		extent.width = glm::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 		extent.height = glm::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 	}
@@ -589,7 +388,7 @@ void skeleton::Renderer::CreateSwapchain()
 
 	VkSwapchainCreateInfoKHR createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	createInfo.surface = surface;
+	createInfo.surface = backend->surface;
 	createInfo.clipped = VK_TRUE;
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageFormat = formatInfo.format;
@@ -630,7 +429,7 @@ void skeleton::Renderer::CreateSwapchain()
 	}
 }
 
-void skeleton::Renderer::CreateRenderpass()
+void Renderer::CreateRenderpass()
 {
 	VkAttachmentDescription colorDesc = {};
 	colorDesc.format = swapchainFormat;
@@ -689,7 +488,7 @@ void skeleton::Renderer::CreateRenderpass()
 		"Failed to create renderpass");
 }
 
-void skeleton::Renderer::CreateDepthImage()
+void Renderer::CreateDepthImage()
 {
 	VkFormat depthFormat = FindDepthFormat();
 	CreateImage(
@@ -705,7 +504,7 @@ void skeleton::Renderer::CreateDepthImage()
 	depthImageView = CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage);
 }
 
-void skeleton::Renderer::CreateFrameBuffers()
+void Renderer::CreateFrameBuffers()
 {
 	VkFramebufferCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -729,10 +528,10 @@ void skeleton::Renderer::CreateFrameBuffers()
 	}
 }
 
-void skeleton::Renderer::RecordCommandBuffers()
+void Renderer::RecordCommandBuffers()
 {
 	m_boundParProg = 0;
-	skeleton::parProg_t* parProg;
+	parProg_t* parProg;
 
 	uint32_t comandCount = static_cast<uint32_t>(commandBuffers.size());
 	VkCommandBufferBeginInfo beginInfo = {};
@@ -762,7 +561,6 @@ void skeleton::Renderer::RecordCommandBuffers()
 		// TODO : Only bind pipelines once
 		for (uint32_t j = 0; j < vulkanContext.renderables.size(); j++)
 		{
-			SKL_PRINT_SLIM("%u %u", i, j);
 			parProg = &vulkanContext.parProgs[vulkanContext.renderables[j].parProgIndex];
 			vkCmdBindPipeline(
 				commandBuffers[i],
@@ -789,68 +587,7 @@ void skeleton::Renderer::RecordCommandBuffers()
 // Helpers
 //=================================================
 
-// Returns the first instance of a queue with the input flags
-uint32_t skeleton::Renderer::GetQueueIndex(
-	std::vector<VkQueueFamilyProperties>& _queues,
-	VkQueueFlags _flags)
-{
-	uint32_t i = 0;
-	uint32_t bestfit = -1;
-
-	for (const auto& props : _queues)
-	{
-		if ((props.queueFlags & _flags) == _flags)
-		{
-			// Attempt to avoid queues that share with Graphics
-			if ((props.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0 || (_flags & VK_QUEUE_GRAPHICS_BIT))
-			{
-				return i;
-			}
-			else
-			{
-				bestfit = i;
-			}
-		}
-
-		i++;
-	}
-
-	// Returns bestfit (-1 if no bestfit was found)
-	return bestfit;
-}
-
-// Returns the first instance of a presentation queue
-uint32_t skeleton::Renderer::GetPresentIndex(
-	const VkPhysicalDevice* _device,
-	uint32_t _queuePropertyCount,
-	uint32_t _graphicsIndex)
-{
-	uint32_t bestfit = -1;
-	VkBool32 supported;
-
-
-	for (uint32_t i = 0; i < _queuePropertyCount; i++)
-	{
-		vkGetPhysicalDeviceSurfaceSupportKHR(*_device, i, surface, &supported);
-		if (supported)
-		{
-			// Attempt to avoid queues that share with Graphics
-			if (i != _graphicsIndex)
-			{
-				return i;
-			}
-			else
-			{
-				bestfit = i;
-			}
-		}
-	}
-
-	// Returns bestfit (-1 if no bestfit was found)
-	return bestfit;
-}
-
-VkImageView skeleton::Renderer::CreateImageView(
+VkImageView Renderer::CreateImageView(
 	VkFormat _format,
 	VkImageAspectFlags _aspect,
 	const VkImage& _image)
@@ -878,7 +615,7 @@ VkImageView skeleton::Renderer::CreateImageView(
 	return tmpView;
 }
 
-void skeleton::Renderer::CreateModelBuffers()
+void Renderer::CreateModelBuffers()
 {
 	// Create uniform buffer
 	VkDeviceSize mvpSize = sizeof(MVPMatrices);
@@ -890,7 +627,7 @@ void skeleton::Renderer::CreateModelBuffers()
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
-void skeleton::Renderer::CreateImage(
+void Renderer::CreateImage(
 	uint32_t _width,
 	uint32_t _height,
 	VkFormat _format,
@@ -937,7 +674,7 @@ void skeleton::Renderer::CreateImage(
 	vkBindImageMemory(vulkanContext.device, _image, _memory, 0);
 }
 
-void skeleton::Renderer::CreateTextureImage(
+void Renderer::CreateTextureImage(
 	const char* _directory,
 	VkImage& _image,
 	VkImageView& _view,
@@ -947,7 +684,7 @@ void skeleton::Renderer::CreateTextureImage(
 	// Image loading
 	//=================================================
 	int width, height;
-	void* img = skeleton::tools::LoadImageFile(_directory, width, height);
+	void* img = LoadImageFile(_directory, width, height);
 	VkDeviceSize size = width * height * 4;
 
 	// Staging buffer
@@ -965,7 +702,7 @@ void skeleton::Renderer::CreateTextureImage(
 
 	bufferManager->FillBuffer(stagingMemory, img, size);
 
-	skeleton::tools::DestroyImageFile(img);
+	DestroyImageFile(img);
 
 	// Image creation
 	//=================================================
@@ -1003,7 +740,7 @@ void skeleton::Renderer::CreateTextureImage(
 	_sampler = CreateSampler();
 }
 
-VkSampler skeleton::Renderer::CreateSampler()
+VkSampler Renderer::CreateSampler()
 {
 	VkSamplerCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1035,7 +772,7 @@ VkSampler skeleton::Renderer::CreateSampler()
 	return tmpSampler;
 }
 
-void skeleton::Renderer::TransitionImageLayout(
+void Renderer::TransitionImageLayout(
 	VkImage _iamge,
 	VkFormat _format,
 	VkImageLayout _old,
@@ -1086,7 +823,7 @@ void skeleton::Renderer::TransitionImageLayout(
 	EndSingleTimeCommand(transitionCommand, graphicsPool, vulkanContext.graphicsQueue);
 }
 
-void skeleton::Renderer::CopyBufferToImage(
+void Renderer::CopyBufferToImage(
 	VkBuffer _buffer,
 	VkImage _image,
 	uint32_t _width,
@@ -1118,7 +855,7 @@ void skeleton::Renderer::CopyBufferToImage(
 	EndSingleTimeCommand(command, bufferManager->transientPool, vulkanContext.transferQueue);
 }
 
-VkFormat skeleton::Renderer::FindDepthFormat()
+VkFormat Renderer::FindDepthFormat()
 {
 	return FindSupportedFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -1126,7 +863,7 @@ VkFormat skeleton::Renderer::FindDepthFormat()
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
-VkFormat skeleton::Renderer::FindSupportedFormat(
+VkFormat Renderer::FindSupportedFormat(
 	const std::vector<VkFormat>& _candidates,
 	VkImageTiling _tiling,
 	VkFormatFeatureFlags _features)

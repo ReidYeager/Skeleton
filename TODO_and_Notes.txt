@@ -1,17 +1,48 @@
 \Skeleton\Sandbox\Main.cpp
 	 TODO :--: Line     5 :--: // TODO : Implement shader layout file handling
 	 TODO :--: Line     6 :--: // TODO : Define shader files/directory
+\Skeleton\Skeleton\Libraries\include\glm\detail\compute_common.hpp
+	 TODO :--: Line    22 :--: // TODO, perf comp with: *(((int *) &x) + 1) &= 0x7fffffff;
+\Skeleton\Skeleton\Libraries\include\glm\gtx\matrix_decompose.inl
+	 TODO :--: Line    51 :--: /// TODO: Fixme!
+\Skeleton\Skeleton\Libraries\include\glm\simd\common.h
+	 TODO :--: Line   136 :--: /* trunc TODO
+\Skeleton\Skeleton\Libraries\include\sdl\SDL_config_winrt.h
+	 TODO :--: Line   123 :--: //#define HAVE__STRLWR 1	// TODO, WinRT: consider using _strlwr_s instead
+	 TODO :--: Line   127 :--: //#define HAVE_ITOA 1   // TODO, WinRT: consider using _itoa_s instead
+	 TODO :--: Line   128 :--: //#define HAVE__LTOA 1	// TODO, WinRT: consider using _ltoa_s instead
+	 TODO :--: Line   129 :--: //#define HAVE__ULTOA 1	// TODO, WinRT: consider using _ultoa_s instead
+	 TODO :--: Line   141 :--: //#define HAVE_SSCANF 1	// TODO, WinRT: consider using sscanf_s instead
+\Skeleton\Skeleton\Libraries\include\sdl\SDL_opengl.h
+	 NOTE :--: Line  2153 :--: ** NOTE!!!!!  If you add new functions to this file, or update
+\Skeleton\Skeleton\Libraries\include\sdl\SDL_stdinc.h
+	 TODO :--: Line   335 :--: /* TODO: include/SDL_stdinc.h:174: error: size of array 'SDL_dummy_enum' is negative */
+\Skeleton\Skeleton\Libraries\include\stb\stb_image.h
+	 NOTE :--: Line    18 :--: QUICK NOTES:
+\Skeleton\Skeleton\Libraries\include\tinyobjloader\tiny_obj_loader.h
+	 TODO :--: Line    66 :--: // TODO(syoyo): Better C++11 detection for older compiler
+	 NOTE :--: Line   402 :--: // NOTE(syoyo): array index is based on the appearance order.
+	 TODO :--: Line   724 :--: // TODO(syoyo): bspline, surface, ...
+	 NOTE :--: Line   850 :--: // NOTE: THESE MUST BE DECLARED HERE SINCE WE ARE NOT ALLOWED
+	 NOTE :--: Line   911 :--: // NOTE: Don't use powf here, it will absolutely murder precision.
+	 TODO :--: Line  1227 :--: // TODO(syoyo): Check if arg is int type.
+	 TODO :--: Line  1254 :--: // TODO(syoyo): Support parsing texture option flag after the filename.
+	 TODO :--: Line  1363 :--: // TODO(syoyo): refactor function.
+	 NOTE :--: Line  1868 :--: // NOTE: Interpretation of Tr is application(exporter) dependent. For
+	 TODO :--: Line  2306 :--: // TODO(syoyo): Add syntax check
+	 TODO :--: Line  2317 :--: // TODO(syoyo): # of elements check
+	 TODO :--: Line  2800 :--: // TODO(syoyo): Support parsing vertex color extension.
 \Skeleton\Skeleton\src\Skeleton\Core\Vertex.h
 	 TODO :--: Line    62 :--: // TODO : Make a better hash function http://www.azillionmonkeys.com/qed/hash.html
 \Skeleton\Skeleton\src\Skeleton\Renderer\ParProgs.h
 	 TODO :--: Line    32 :--: // TODO : Implement options for all pipeline settings
 \Skeleton\Skeleton\src\Skeleton\Renderer\Renderer.cpp
-	 TODO :--: Line   231 :--: // TODO : Move camera to Application
-	 TODO :--: Line   560 :--: // TODO : Only bind pipelines once
-	 TODO :--: Line   761 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
+	 TODO :--: Line   193 :--: // TODO : Move camera to Application
+	 TODO :--: Line   249 :--: // TODO : Only bind pipelines once
+	 TODO :--: Line   375 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
 \Skeleton\Skeleton\src\Skeleton\Renderer\RendererBackend.h
 	 TODO :--: Line     9 :--: // TODO : Clean this file up
 	 TODO :--: Line    35 :--: // TODO : Create buffer/image function
 	 TODO :--: Line   187 :--: // TODO : Better handle buffer memory
 	 TODO :--: Line   194 :--: // TODO : Upgrade this to allow more buffers
-	 TODO :--: Line   270 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)
+	 TODO :--: Line   275 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)

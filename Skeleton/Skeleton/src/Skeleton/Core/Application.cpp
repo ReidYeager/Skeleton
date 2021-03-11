@@ -60,6 +60,9 @@ void Application::MainLoop()
 	auto prevTime = startTime;
 	float camSpeed = 2.f;
 	float mouseSensativity = 0.1f;
+	uint32_t FPSPrintVal = 0;
+	std::vector<float> secondDeltas;
+	uint32_t FPSCap = 300;
 
 	while (stayOpen)
 	{
@@ -68,7 +71,6 @@ void Application::MainLoop()
 		sklTime.deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(curTime - prevTime).count();
 
 		// FPS cap
-		uint32_t FPSCap = 300;
 		while (sklTime.deltaTime < (1.f / FPSCap))
 		{
 			curTime = std::chrono::high_resolution_clock::now();
@@ -116,7 +118,25 @@ void Application::MainLoop()
 
 		renderer->RenderFrame();
 
-		SKL_PRINT_SLIM("%8f, %8f, %6u, %8f FPS", sklTime.totalTime, sklTime.deltaTime, sklTime.frameCount, 1.f / sklTime.deltaTime);
+		if (sklTime.totalTime < FPSPrintVal)
+		{
+			secondDeltas.push_back(sklTime.deltaTime);
+		}
+		else
+		{
+			float avgFPS = 0;
+			for (float& delta : secondDeltas)
+			{
+				avgFPS += delta;
+			}
+			avgFPS /= secondDeltas.size();
+
+			SKL_PRINT_SLIM("%6.0f sec, %4.2f ms average, Frame# %6u, %4.2f FPS", sklTime.totalTime, avgFPS * 1000.f, sklTime.frameCount, 1.f / avgFPS);
+			FPSPrintVal++;
+
+			secondDeltas.clear();
+		}
+
 		prevTime = curTime;
 		sklTime.frameCount++;
 	}

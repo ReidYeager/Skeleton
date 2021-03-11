@@ -388,7 +388,8 @@ void CreateDescriptorSetLayout(parProg_t& _program)
 		vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo, nullptr, &_program.descriptorSetLayout),
 		"Failed to create descriptor set layout");
 
-	//Pipeline Layout/////////////////////////////////////////////////////////
+	// Pipeline Layout
+	//=================================================
 	VkPipelineLayoutCreateInfo layoutInfo = {};
 	layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	layoutInfo.setLayoutCount = 1;

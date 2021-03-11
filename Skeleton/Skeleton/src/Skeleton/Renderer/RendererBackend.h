@@ -86,7 +86,7 @@ extern SklVulkanContext_t vulkanContext;
 // Commands
 //=================================================
 
-inline void CreateCommandPool(
+inline void SklCreateCommandPool(
 	VkCommandPool& _pool,
 	uint32_t _queueIndex,
 	VkCommandPoolCreateFlags _flags = 0)
@@ -207,7 +207,7 @@ public:
 public:
 	BufferManager()
 	{
-		CreateCommandPool(transientPool, vulkanContext.transferIdx);
+		SklCreateCommandPool(transientPool, vulkanContext.transferIdx);
 	}
 	~BufferManager();
 
@@ -259,6 +259,11 @@ public:
 
 #include "sdl/SDL.h"
 #include "sdl/SDL_vulkan.h"
+
+//=================================================
+// Renderer Backend
+//=================================================
+
 // Initialization and drawing
 class SklRendererBackend
 {
@@ -270,21 +275,44 @@ private:
 public:
 	// TODO : Find a way to remove SDL window from Create(instance/swapchain)
 	SDL_Window* window;
+	BufferManager* bufferManager;
 
 	VkInstance instance;
 	VkSurfaceKHR surface;
 
+	VkSwapchainKHR swapchain;
+	VkFormat swapchainFormat;
+	std::vector<VkImage> swapchainImages;
+	std::vector<VkImageView> swapchainImageViews;
+	std::vector<VkFramebuffer> frameBuffers;
+
+	VkImage depthImage;
+	VkImageView depthImageView;
+	VkDeviceMemory depthMemory;
+
+	VkDescriptorPool descriptorPool;
+
+	// Synchronization
+	#define MAX_FLIGHT_IMAGE_COUNT 3
+	std::vector<VkFence> imageIsInFlightFences;
+	std::vector<VkFence> flightFences;
+	std::vector<VkSemaphore> renderCompleteSemaphores;
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	uint32_t currentFrame = 0;
+
+	VkCommandPool graphicsCommandPool;
+	std::vector<VkCommandBuffer> commandBuffers;
+
 public:
+	//=================================================
+	// Initialization
+	//=================================================
+
 	SklRendererBackend(
 		SDL_Window* _window,
-		const std::vector<const char*>& _extraExtensions) : window(_window)
-	{
-		// Include the extra extensions specified
-		for (const char* additionalExtension : _extraExtensions)
-		{
-			instanceExtensions.push_back(additionalExtension);
-		}
-	}
+		const std::vector<const char*>& _extraExtensions);
+
+	~SklRendererBackend();
 
 	// Creates the vkInstance & vkSurface
 	void CreateInstance();
@@ -296,9 +324,34 @@ public:
 		uint32_t& _graphicsIndex,
 		uint32_t& _presentIndex,
 		uint32_t& _transferIndex);
+	void CreateCommandPool();
 
+	//=================================================
+	// Renderer
+	//=================================================
+
+	void InitializeRenderComponents();
+	void CreateRenderComponents();
+	void CleanupRenderComponents();
+	void RecreateRenderComponents();
+
+	void CreateSwapchain();
+	void CreateRenderpass();
+	void CreateDepthImage();
+	void CreateFramebuffers();
+
+	void CreateDescriptorPool();
+	void CreateSyncObjects();
+	void CreateCommandBuffers();
+
+
+	//=================================================
 	// Helpers
 	//=================================================
+	
+	// Initialization
+	//=================================================
+
 	// Returns the first instance of a queue with the input flags
 	uint32_t GetQueueIndex(
 		std::vector<VkQueueFamilyProperties>& _queues,
@@ -309,6 +362,32 @@ public:
 		const VkPhysicalDevice* _device,
 		uint32_t _queuePropertyCount,
 		uint32_t _graphicsIndex);
+
+	// Renderer
+	//=================================================
+
+	void CreateImage(
+		uint32_t _width,
+		uint32_t _height,
+		VkFormat _format,
+		VkImageTiling _tiling,
+		VkImageUsageFlags _usage,
+		VkMemoryPropertyFlags _memFlags,
+		VkImage& _image,
+		VkDeviceMemory& _memory);
+
+	VkImageView CreateImageView(
+		const VkFormat _format,
+		VkImageAspectFlags _aspect,
+		const VkImage& _image);
+
+	VkFormat FindDepthFormat();
+
+	VkFormat FindSupportedFormat(
+		const std::vector<VkFormat>& _candidates,
+		VkImageTiling _tiling,
+		VkFormatFeatureFlags _features);
+
 };
 
 #endif // RENDERER_BACKEND_H

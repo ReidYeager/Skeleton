@@ -9,46 +9,48 @@
 class sandboxApp : public Application
 {
 public:
-	void Init()
-	{
-		__super::Init();
+  void Start()
+  {
+    renderer->cam.yaw = -90.f;
+    renderer->cam.position.z = 3;
+    renderer->cam.UpdateProjection(
+        vulkanContext.renderExtent.width / float(vulkanContext.renderExtent.height));
 
-		renderer->CreateRenderer();
-		renderer->CreateModelBuffers();
+    renderer->CreateModelBuffers();
 
-		uint32_t i = GetProgram("default", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_FRONT);
-		uint32_t j = GetProgram("blue", SKL_SHADER_VERT_STAGE | SKL_SHADER_FRAG_STAGE, SKL_CULL_MODE_BACK);
-		CreateObject("./res/models/SphereSmooth.obj", j);
-		CreateObject("./res/models/SphereSmooth.obj", i);
-		CreateObject("./res/models/Cube.obj", i);
+    uint32_t i = GetShaderProgram("default", Skl_Shader_Vert_Stage | Skl_Shader_Frag_Stage,
+                                  Skl_Cull_Mode_Front);
+    uint32_t j = GetShaderProgram("blue", Skl_Shader_Vert_Stage | Skl_Shader_Frag_Stage,
+                                  Skl_Cull_Mode_Back);
+    CreateObject("./res/models/SphereSmooth.obj", j);
+    CreateObject("./res/models/SphereSmooth.obj", i);
+    CreateObject("./res/models/Cube.obj", i);
 
-		renderer->RecordCommandBuffers();
-	}
+    renderer->RecordCommandBuffers();
+  }
 
-	void CoreLoop()
-	{
-		for (const auto& r : vulkanContext.renderables)
-		{
-			renderer->bufferManager->CopyBuffer(renderer->mvpBuffer, r.buffers[0]->buffer, sizeof(mvp));
-		}
-	}
+  void CoreLoop()
+  {
+    for (const auto& r : vulkanContext.renderables)
+    {
+      renderer->bufferManager->CopyBuffer(renderer->mvpBuffer, r.buffers[0]->buffer, sizeof(mvp));
+    }
+  }
 
 };
 
 int main(int argc, char* argv[])
 {
-	try
-	{
-		sandboxApp app;
-		app.Init();
-		app.Run();
-		app.Cleanup();
-	}
-	catch (const char* e)
-	{
-		std::cout << "Caught: " << e << "\n";
-	}
+  try
+  {
+    sandboxApp app;
+    app.Run();
+  }
+  catch (const char* e)
+  {
+    std::cout << "Caught: " << e << "\n";
+  }
 
-	return 0;
+  return 0;
 }
 

@@ -1,17 +1,21 @@
-#pragma once
-
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
+#ifndef SKELETON_CORE_TRANSFORM_H
+#define SKELETON_CORE_TRANSFORM_H
+
 struct Transform
 {
-	glm::vec3 position;
-	glm::vec3 rotation;
-	glm::vec3 scale;
+  glm::vec3 position;  // In Meters
+  glm::vec3 rotation;  // In degrees
+  glm::vec3 scale;     // Relative scale multiplier
 
-	glm::mat4 GetRotationMatrix()
-	{
-		return glm::mat4_cast(glm::radians(eulerAngles));
-	}
+  // Converts the rotation Euler angles to a quaternion
+  glm::mat4 GetRotationMatrix()
+  {
+    return glm::mat4_cast(glm::radians(eulerAngles));
+  }
 };
+
+#endif // !SKELETON_CORE_TRANSFORM_H
 

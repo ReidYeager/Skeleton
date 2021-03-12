@@ -27,9 +27,6 @@
     <ClInclude Include="src\Skeleton\Renderer\Renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Common.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Skeleton\Core\DebugTools.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -51,13 +48,10 @@
     <ClInclude Include="src\Skeleton\Core\FileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\ParProgs.h">
+    <ClInclude Include="src\Skeleton\Renderer\ShaderProgram.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Skeleton\Renderer\Image.h">
@@ -77,13 +71,10 @@
     <ClCompile Include="src\Skeleton\Core\Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\ParProgs.cpp">
+    <ClCompile Include="src\Skeleton\Renderer\ShaderProgram.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderable.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

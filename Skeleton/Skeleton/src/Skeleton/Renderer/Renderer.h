@@ -1,4 +1,3 @@
-#pragma once
 
 #include <vector>
 
@@ -11,100 +10,89 @@
 #include "Skeleton/Renderer/RendererBackend.h"
 #include "Skeleton/Core/Camera.h"
 
+#ifndef SKELETON_RENDERER_RENDERER_H
+#define SKELETON_RENDERER_RENDERER_H
+
 class Renderer
 {
-//=================================================
-// Variables
-//=================================================
+  //=================================================
+  // Variables
+  //=================================================
 public:
-	SklRendererBackend* backend;
-	BufferManager* bufferManager;
+  SklRendererBackend* backend;
+  BufferManager* bufferManager;
 
-	struct MVPMatrices {
-		glm::mat4 model;
-		glm::mat4 view;
-		glm::mat4 proj;
-	} mvp;
+  // Transformation matrices for objects
+  struct MVPMatrices {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+  } mvp;
 
-	VkBuffer vertBuffer;
-	VkDeviceMemory vertMemory;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexMemory;
+  // TODO : Move to an Object class
+  VkBuffer mvpBuffer;
+  VkDeviceMemory mvpMemory;
 
-	// Move out of renderer
-	//=================================================
-	VkBuffer mvpBuffer;
-	VkDeviceMemory mvpMemory;
+  // TODO : Move to the Main Application
+  Camera cam;
 
-	Camera cam;
-
-//=================================================
-// Functions
-//=================================================
+  //=================================================
+  // Functions
+  //=================================================
 public:
-	// Initialization & Cleanup
-	//=================================================
+  // Initialization & Cleanup
+  //=================================================
 
-	// Initializes the renderer in its entirety
-	Renderer(
-		const std::vector<const char*>& _extraExtensions,
-		SDL_Window* _window);
-	// Cleans up all vulkan objects
-	~Renderer();
+  // Creates the RendererBackend and BufferManager
+  Renderer(const std::vector<const char*>& _extraExtensions, SDL_Window* _window);
+  // Cleans up the RendererBackend
+  ~Renderer();
 
-	// Create Renderer
-	//=================================================
+  // RendererBackend
+  //=================================================
 
-	void CreateRenderer();
-	void CleanupRenderer();
-	void RecreateRenderer();
+  // Initializes the RendererBackend
+  void CreateRenderer();
+  // Cleans up the RendererBackend
+  void CleanupRenderer();
+  // Recreates the RendererBackend
+  void RecreateRenderer();
 
-	// Runtime
-	//=================================================
+  // Runtime
+  //=================================================
 
-	void RenderFrame();
+  // Handles all rendering processes
+  // Fetches the next image and places in the rendering and presentation queues
+  void RenderFrame();
 
-	void CreateDescriptorSet(
-		parProg_t& _prog,
-		sklRenderable_t& _renderable);
+  // Defines buffers and images for a shaderProgram's bindings
+  void CreateDescriptorSet(shaderProgram_t& _prog, sklRenderable_t& _renderable);
 
-	void CreateModelBuffers();
-	void RecordCommandBuffers();
+  // TODO : Remove when Objects have individual MVP buffers/push-constants
+  // Creates a universal MVP buffer
+  void CreateModelBuffers();
+  // Records rendering information into commandbuffers
+  void RecordCommandBuffers();
 
 protected:
-	// Initializers
-	//=================================================
+  // Helpers
+  //=================================================
 
-	// Pre-renderer creation
+  // Loads image from file to a texture
+  void CreateTextureImage(const char* _directory, VkImage& _image, VkImageView& _view,
+                          VkDeviceMemory& _memory, VkSampler& _sampler);
 
-	// Post-renderer creation
+  // Creates a generic imageSampler
+  VkSampler CreateSampler();
 
-	// Create Renderer Functions
-	//=================================================
+  // Changes the ImageLayout of an image via a commandBuffer
+  void TransitionImageLayout(VkImage _iamge, VkFormat _format,
+                             VkImageLayout _oldLayout, VkImageLayout _newLayout);
 
-	// Helpers
-	//=================================================
-
-	void CreateTextureImage(
-		const char* _directory,
-		VkImage& _image,
-		VkImageView& _view,
-		VkDeviceMemory& _memory,
-		VkSampler& _sampler);
-
-	VkSampler CreateSampler();
-
-	void TransitionImageLayout(
-		VkImage _iamge,
-		VkFormat _format,
-		VkImageLayout _old,
-		VkImageLayout _new);
-
-	void CopyBufferToImage(
-		VkBuffer _buffer,
-		VkImage _image,
-		uint32_t _width,
-		uint32_t _height);
+  // Copies a VkBuffer to a VkImage
+  void CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width, uint32_t _height);
 
 }; // Renderer
+
+#endif // !SKELETON_RENDERER_RENDERER_H
 

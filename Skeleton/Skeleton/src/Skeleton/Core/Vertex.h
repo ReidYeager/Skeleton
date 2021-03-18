@@ -16,7 +16,7 @@
 #include "vulkan/vulkan.h"
 
 #ifndef SKELETON_CORE_VERTEX_H
-#define SKELETON_CORE_VERTEX_H
+#define SKELETON_CORE_VERTEX_H 1
 
 // Per-vertex information used to build and render meshes
 struct vertex_t

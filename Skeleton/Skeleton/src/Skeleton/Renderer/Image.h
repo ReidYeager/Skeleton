@@ -1,17 +1,26 @@
 
 #include "vulkan/vulkan.h"
 
-#ifndef SKELETON_CORE_RENDERER_IMAGE_H
-#define SKELETON_CORE_RENDERER_IMAGE_H
+#ifndef SKELETON_RENDERER_IMAGE_H
+#define SKELETON_RENDERER_IMAGE_H 1
 
 // Stores all information Vulkan needs to render an image
-struct ImageInfo
+struct sklImage_t
 {
-  VkImage			image;
-  VkDeviceMemory	memory;
-  VkImageView		view;
-  VkSampler		sampler;
+  VkImage         image;
+  VkDeviceMemory  memory;
+  VkImageView     view;
+  VkSampler       sampler;
+  VkFormat        format;
 };
 
-#endif // !SKELETON_CORE_RENDERER_IMAGE_H
+struct sklTexture_t
+{
+  const char* directory;
+  uint32_t imageIndex;
+
+  sklTexture_t(const char* _dir) : directory(_dir) {}
+};
+
+#endif // !SKELETON_RENDERER_SKL_IMAGE_H
 

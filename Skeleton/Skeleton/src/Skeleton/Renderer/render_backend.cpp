@@ -1,300 +1,40 @@
 
 #include "pch.h"
-#include "RendererBackend.h"
-#include "Skeleton/Core/DebugTools.h"
-#include "Skeleton/Core/Time.h"
+#include "render_backend.h"
 
-BufferManager::~BufferManager()
-{
-  vkDeviceWaitIdle(vulkanContext.device);
-
-  uint32_t bufferCount = GetBufferCount();
-  for (uint32_t i = 0; i < bufferCount; i++)
-  {
-    if (GetIndexBitMapAt(i))
-    {
-      vkFreeMemory(vulkanContext.device, m_memories[i], nullptr);
-      vkDestroyBuffer(vulkanContext.device, m_buffers[i], nullptr);
-    }
-  }
-
-  vkDestroyCommandPool(vulkanContext.device, transientPool, nullptr);
-}
-
-bool BufferManager::GetIndexBitMapAt(uint32_t _index)
-{
-  return (m_indexBitMap & (1i64 << _index));
-}
-
-void BufferManager::SetIndexBitMapAt(uint32_t _index, bool _value /*= true*/)
-{
-  if (_value)
-  {
-    m_indexBitMap |= (1i64 << _index);
-  }
-  else
-  {
-    m_indexBitMap &= ~(1i64 << _index);
-  }
-}
-
-const VkBuffer* BufferManager::GetBuffer(uint32_t _index)
-{
-  if (GetIndexBitMapAt(_index))
-  {
-    return &m_buffers[_index];
-  }
-  else
-  {
-    return nullptr;
-  }
-}
-
-const VkDeviceMemory* BufferManager::GetMemory(uint32_t _index)
-{
-  if (GetIndexBitMapAt(_index))
-  {
-    return &m_memories[_index];
-  }
-  else
-  {
-    return nullptr;
-  }
-}
-
-void BufferManager::RemoveAtIndex(uint32_t _index)
-{
-  SetIndexBitMapAt(_index, false);
-  vkFreeMemory(vulkanContext.device, m_memories[_index], nullptr);
-  vkDestroyBuffer(vulkanContext.device, m_buffers[_index], nullptr);
-}
-
-uint32_t BufferManager::GetFirstAvailableIndex()
-{
-  uint32_t arraySize = static_cast<uint32_t>(m_buffers.size());
-  uint32_t i = 0;
-  while (i <= arraySize && i < INDEXBITMAPSIZE)
-  {
-    if (GetIndexBitMapAt(i) == 0)
-    {
-      return i;
-    }
-
-    i++;
-  }
-  SKL_LOG(SKL_ERROR, "Failed to find an available index");
-  return -1;
-}
-
-uint32_t BufferManager::CreateAndFillBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory,
-                                            const void* _data, VkDeviceSize _size,
-                                            VkBufferUsageFlags _usage)
-{
-  VkBuffer stagingBuffer;
-  VkDeviceMemory stagingMemory;
-  uint32_t stagingBufferIndex =
-      CreateBuffer(stagingBuffer, stagingMemory, _size,
-                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  FillBuffer(stagingMemory, _data, _size);
-
-  uint32_t index = CreateBuffer(_buffer, _memory, _size, _usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  CopyBuffer(stagingBuffer, _buffer, _size);
-
-  RemoveAtIndex(stagingBufferIndex);
-  return index;
-}
-
-uint32_t BufferManager::CreateBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory,
-                                     VkDeviceSize _size, VkBufferUsageFlags _usage,
-                                     VkMemoryPropertyFlags _memProperties)
-{
-  uint32_t index = GetFirstAvailableIndex();
-  SetIndexBitMapAt(index);
-
-  VkBufferCreateInfo createInfo = {};
-  createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  createInfo.usage = _usage;
-  createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  createInfo.size = _size;
-
-  VkBuffer tmpBuffer;
-  SKL_ASSERT_VK(
-      vkCreateBuffer(vulkanContext.device, &createInfo, nullptr, &tmpBuffer),
-      "Failed to create vert buffer");
-
-  if (index < static_cast<uint32_t>(m_buffers.size()))
-  {
-    m_buffers[index] = tmpBuffer;
-  }
-  else
-  {
-    m_buffers.push_back(tmpBuffer);
-  }
-  _buffer = m_buffers[index];
-
-  VkMemoryRequirements memReq;
-  vkGetBufferMemoryRequirements(vulkanContext.device, _buffer, &memReq);
-
-  VkMemoryAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memReq.size;
-  allocInfo.memoryTypeIndex = FindMemoryType(memReq.memoryTypeBits, _memProperties);
-
-  VkDeviceMemory tmpMemory;
-  SKL_ASSERT_VK(
-      vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &tmpMemory),
-      "Failed to allocate vert memory");
-
-  if (index < static_cast<uint32_t>(m_memories.size()))
-  {
-    m_memories[index] = tmpMemory;
-  }
-  else
-  {
-    m_memories.push_back(tmpMemory);
-  }
-  _memory = m_memories[index];
-
-  vkBindBufferMemory(vulkanContext.device, _buffer, _memory, 0);
-
-  return index;
-}
-
-uint32_t BufferManager::CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage,
-                                     VkMemoryPropertyFlags _memProperties)
-{
-  uint32_t index = GetFirstAvailableIndex();
-  SetIndexBitMapAt(index);
-
-  VkBufferCreateInfo createInfo = {};
-  createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  createInfo.usage = _usage;
-  createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  createInfo.size = _size;
-
-  VkBuffer tmpBuffer;
-  SKL_ASSERT_VK(
-      vkCreateBuffer(vulkanContext.device, &createInfo, nullptr, &tmpBuffer),
-      "Failed to create vert buffer");
-
-  if (index < static_cast<uint32_t>(m_buffers.size()))
-  {
-    m_buffers[index] = tmpBuffer;
-  }
-  else
-  {
-    m_buffers.push_back(tmpBuffer);
-  }
-
-  VkMemoryRequirements memReq;
-  vkGetBufferMemoryRequirements(vulkanContext.device, m_buffers[index], &memReq);
-
-  VkMemoryAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memReq.size;
-  allocInfo.memoryTypeIndex = FindMemoryType(memReq.memoryTypeBits, _memProperties);
-
-  VkDeviceMemory tmpMemory;
-  SKL_ASSERT_VK(
-      vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &tmpMemory),
-      "Failed to allocate vert memory");
-
-  if (index < static_cast<uint32_t>(m_memories.size()))
-  {
-    m_memories[index] = tmpMemory;
-  }
-  else
-  {
-    m_memories.push_back(tmpMemory);
-  }
-
-  vkBindBufferMemory(vulkanContext.device, m_buffers[index], m_memories[index], 0);
-
-  return index;
-}
-
-void BufferManager::FillBuffer(VkDeviceMemory& _memory, const void* _data, VkDeviceSize _size)
-{
-  void* tmpData;
-  vkMapMemory(vulkanContext.device, _memory, 0, _size, 0, &tmpData);
-  memcpy(tmpData, _data, static_cast<size_t>(_size));
-  vkUnmapMemory(vulkanContext.device, _memory);
-}
-
-void BufferManager::CopyBuffer(VkBuffer _src, VkBuffer _dst, VkDeviceSize _size)
-{
-  VkCommandBuffer copyCommand = BeginSingleTimeCommand(transientPool);
-
-  VkBufferCopy region = {};
-  region.size = _size;
-  region.dstOffset = 0;
-  region.srcOffset = 0;
-
-  vkCmdCopyBuffer(copyCommand, _src, _dst, 1, &region);
-
-  EndSingleTimeCommand(copyCommand, transientPool, vulkanContext.transferQueue);
-}
-
-uint32_t BufferManager::FindMemoryType(uint32_t _mask, VkMemoryPropertyFlags _flags)
-{
-  const VkPhysicalDeviceMemoryProperties& props = vulkanContext.gpu.memProperties;
-
-  for (uint32_t i = 0; i < props.memoryTypeCount; i++)
-  {
-    if (_mask & (1 << i) && (props.memoryTypes[i].propertyFlags & _flags) == _flags)
-    {
-      return i;
-    }
-  }
-
-  SKL_ASSERT_VK(
-    VK_ERROR_UNKNOWN,
-    "Failed to find a suitable memory type");
-  return 0;
-}
-
+#include "skeleton/core/debug_tools.h"
+#include "skeleton/core/time.h"
 
 SklVulkanContext_t vulkanContext;
 
 void SklVulkanContext_t::Cleanup()
 {
   SKL_PRINT("Vulkan Context", "Cleanup =================================================");
-  for (uint32_t i = 0; i < parProgs.size(); i++)
+  for (uint32_t i = 0; i < shaderPrograms.size(); i++)
   {
-    vkDestroyPipeline(device, parProgs[i].pipeline, nullptr);
-    vkDestroyPipelineLayout(device, parProgs[i].pipelineLayout, nullptr);
-    vkDestroyDescriptorSetLayout(device, parProgs[i].descriptorSetLayout, nullptr);
+    vkDestroyPipeline(device, shaderPrograms[i].pipeline, nullptr);
+    vkDestroyPipelineLayout(device, shaderPrograms[i].pipelineLayout, nullptr);
+    vkDestroyDescriptorSetLayout(device, shaderPrograms[i].descriptorSetLayout, nullptr);
   }
 
-  for (auto& rend : renderables)
-  {
-    rend.Cleanup();
-  }
+  ImageManager::Cleanup();
+  //BufferManager::Cleanup();
+
+  vulkanContext.renderables.clear();
+  vulkanContext.gpu.queueFamilyProperties.clear();
+  vulkanContext.gpu.extensionProperties.clear();
+  vulkanContext.gpu.presentModes.clear();
+  vulkanContext.gpu.surfaceFormats.clear();
 
   vkDestroyRenderPass(device, renderPass, nullptr);
   vkDestroyDevice(device, nullptr);
-}
-
-void sklRenderable_t::Cleanup()
-{
-  for (const auto& i : images)
-  {
-    vkFreeMemory(vulkanContext.device, i->memory, nullptr);
-    vkDestroySampler(vulkanContext.device, i->sampler, nullptr);
-    vkDestroyImageView(vulkanContext.device, i->view, nullptr);
-    vkDestroyImage(vulkanContext.device, i->image, nullptr);
-  }
 }
 
 //=================================================
 // Renderer Backend
 //=================================================
 
-SklRendererBackend::SklRendererBackend(SDL_Window* _window,
+SklRenderBackend::SklRenderBackend(SDL_Window* _window,
                                        const std::vector<const char*>& _extraExtensions)
                                        : window(_window)
 {
@@ -309,7 +49,7 @@ SklRendererBackend::SklRendererBackend(SDL_Window* _window,
   bufferManager = new BufferManager();
 }
 
-SklRendererBackend::~SklRendererBackend()
+SklRenderBackend::~SklRenderBackend()
 {
   vkDeviceWaitIdle(vulkanContext.device);
 
@@ -324,7 +64,7 @@ SklRendererBackend::~SklRendererBackend()
   vkDestroyInstance(instance, nullptr);
 }
 
-void SklRendererBackend::CreateInstance()
+void SklRenderBackend::CreateInstance()
 {
   // Basic application metadata
   VkApplicationInfo appInfo = {};
@@ -352,7 +92,7 @@ void SklRendererBackend::CreateInstance()
   SDL_Vulkan_CreateSurface(window, instance, &surface);
 }
 
-void SklRendererBackend::CreateDevice()
+void SklRenderBackend::CreateDevice()
 {
   // Select a physical device
   uint32_t queueIndices[3];
@@ -408,7 +148,7 @@ void SklRendererBackend::CreateDevice()
                                        pdInfo.surfaceFormats.data());
 }
 
-void SklRendererBackend::ChoosePhysicalDevice(VkPhysicalDevice& _selectedDevice,
+void SklRenderBackend::ChoosePhysicalDevice(VkPhysicalDevice& _selectedDevice,
                                               uint32_t& _graphicsIndex, uint32_t& _presentIndex,
                                               uint32_t& _transferIndex)
 {
@@ -492,7 +232,7 @@ void SklRendererBackend::ChoosePhysicalDevice(VkPhysicalDevice& _selectedDevice,
   SKL_ASSERT_VK(VK_ERROR_UNKNOWN, "Failed to find a suitable physical device");
 }
 
-void SklRendererBackend::CreateCommandPool()
+void SklRenderBackend::CreateCommandPool()
 {
   SklCreateCommandPool(graphicsCommandPool, vulkanContext.graphicsIdx);
 }
@@ -501,7 +241,7 @@ void SklRendererBackend::CreateCommandPool()
 // Renderer
 //=================================================
 
-void SklRendererBackend::InitializeRenderComponents()
+void SklRenderBackend::InitializeRenderComponents()
 {
   CreateRenderComponents();
 
@@ -510,7 +250,7 @@ void SklRendererBackend::InitializeRenderComponents()
   CreateCommandBuffers();
 }
 
-void SklRendererBackend::CreateRenderComponents()
+void SklRenderBackend::CreateRenderComponents()
 {
   CreateSwapchain();
   CreateRenderpass();
@@ -518,7 +258,7 @@ void SklRendererBackend::CreateRenderComponents()
   CreateFramebuffers();
 }
 
-void SklRendererBackend::CleanupRenderComponents()
+void SklRenderBackend::CleanupRenderComponents()
 {
   // Destroy Sync Objects
   for (uint32_t i = 0; i < MAX_FLIGHT_IMAGE_COUNT; i++)
@@ -535,9 +275,9 @@ void SklRendererBackend::CleanupRenderComponents()
   }
 
   // Destroy Depth Image
-  vkDestroyImage(vulkanContext.device, depthImage, nullptr);
-  vkFreeMemory(vulkanContext.device, depthMemory, nullptr);
-  vkDestroyImageView(vulkanContext.device, depthImageView, nullptr);
+  //vkDestroyImage(vulkanContext.device, depthImage, nullptr);
+  //vkFreeMemory(vulkanContext.device, depthMemory, nullptr);
+  //vkDestroyImageView(vulkanContext.device, depthImageView, nullptr);
 
   // Destroy Renderpass
   //vkDestroyRenderPass(vulkanContext.device, Renderpass)
@@ -550,7 +290,7 @@ void SklRendererBackend::CleanupRenderComponents()
   vkDestroySwapchainKHR(vulkanContext.device, swapchain, nullptr);
 }
 
-void SklRendererBackend::RecreateRenderComponents()
+void SklRenderBackend::RecreateRenderComponents()
 {
   vkDeviceWaitIdle(vulkanContext.device);
 
@@ -562,7 +302,7 @@ void SklRendererBackend::RecreateRenderComponents()
 // Renderer Create Functions
 //=================================================
 
-void SklRendererBackend::CreateSwapchain()
+void SklRenderBackend::CreateSwapchain()
 {
   // Find the best surface format
   VkSurfaceFormatKHR formatInfo = vulkanContext.gpu.surfaceFormats[0];
@@ -656,7 +396,7 @@ void SklRendererBackend::CreateSwapchain()
   }
 }
 
-void SklRendererBackend::CreateRenderpass()
+void SklRenderBackend::CreateRenderpass()
 {
   VkAttachmentDescription colorDesc = {};
   colorDesc.format = swapchainFormat;
@@ -715,23 +455,19 @@ void SklRendererBackend::CreateRenderpass()
       "Failed to create renderpass");
 }
 
-void SklRendererBackend::CreateDepthImage()
+void SklRenderBackend::CreateDepthImage()
 {
   VkFormat depthFormat = FindDepthFormat();
-  CreateImage(
-    vulkanContext.renderExtent.width,
-    vulkanContext.renderExtent.height,
-    depthFormat,
-    VK_IMAGE_TILING_OPTIMAL,
-    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    depthImage,
-    depthMemory);
+  uint32_t i = CreateImage(vulkanContext.renderExtent.width, vulkanContext.renderExtent.height,
+                           depthFormat, VK_IMAGE_TILING_OPTIMAL,
+                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-  depthImageView = CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage);
+  depthImage = ImageManager::images[i];
+  depthImage->view = CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage->image);
 }
 
-void SklRendererBackend::CreateFramebuffers()
+void SklRenderBackend::CreateFramebuffers()
 {
   VkFramebufferCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -745,7 +481,7 @@ void SklRendererBackend::CreateFramebuffers()
 
   for (uint32_t i = 0; i < imageCount; i++)
   {
-    VkImageView attachments[] = { swapchainImageViews[i], depthImageView };
+    VkImageView attachments[] = { swapchainImageViews[i], depthImage->view };
     createInfo.attachmentCount = 2;
     createInfo.pAttachments = attachments;
 
@@ -755,7 +491,7 @@ void SklRendererBackend::CreateFramebuffers()
   }
 }
 
-void SklRendererBackend::CreateDescriptorPool()
+void SklRenderBackend::CreateDescriptorPool()
 {
   VkDescriptorPoolSize poolSizes[2] = {};
   poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -774,7 +510,7 @@ void SklRendererBackend::CreateDescriptorPool()
       "Failed to create descriptor pool");
 }
 
-void SklRendererBackend::CreateSyncObjects()
+void SklRenderBackend::CreateSyncObjects()
 {
   imageIsInFlightFences.resize(swapchainImages.size(), VK_NULL_HANDLE);
   flightFences.resize(MAX_FLIGHT_IMAGE_COUNT);
@@ -805,7 +541,7 @@ void SklRendererBackend::CreateSyncObjects()
   }
 }
 
-void SklRendererBackend::CreateCommandBuffers()
+void SklRenderBackend::CreateCommandBuffers()
 {
   uint32_t bufferCount = static_cast<uint32_t>(swapchainImages.size());
   commandBuffers.resize(bufferCount);
@@ -828,7 +564,7 @@ void SklRendererBackend::CreateCommandBuffers()
 // Initialization
 //=================================================
 
-uint32_t SklRendererBackend::GetQueueIndex(std::vector<VkQueueFamilyProperties>& _queues,
+uint32_t SklRenderBackend::GetQueueIndex(std::vector<VkQueueFamilyProperties>& _queues,
                                            VkQueueFlags _flags)
 {
   uint32_t i = 0;
@@ -856,7 +592,7 @@ uint32_t SklRendererBackend::GetQueueIndex(std::vector<VkQueueFamilyProperties>&
   return bestfit;
 }
 
-uint32_t SklRendererBackend::GetPresentIndex(const VkPhysicalDevice* _device,
+uint32_t SklRenderBackend::GetPresentIndex(const VkPhysicalDevice* _device,
                                              uint32_t _queuePropertyCount, uint32_t _graphicsIndex)
 {
   uint32_t bestfit = -1;
@@ -887,50 +623,15 @@ uint32_t SklRendererBackend::GetPresentIndex(const VkPhysicalDevice* _device,
 // Renderer
 //=================================================
 
-void SklRendererBackend::CreateImage(uint32_t _width, uint32_t _height, VkFormat _format,
-                                     VkImageTiling _tiling, VkImageUsageFlags _usage,
-                                     VkMemoryPropertyFlags _memFlags, VkImage& _image,
-                                     VkDeviceMemory& _memory)
+uint32_t SklRenderBackend::CreateImage(uint32_t _width, uint32_t _height, VkFormat _format,
+                                       VkImageTiling _tiling, VkImageUsageFlags _usage,
+                                       VkMemoryPropertyFlags _memFlags)
 {
-  VkImageCreateInfo createInfo = {};
-  createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  createInfo.imageType = VK_IMAGE_TYPE_2D;
-  createInfo.extent.width = _width;
-  createInfo.extent.height = _height;
-  createInfo.extent.depth = 1;
-  createInfo.mipLevels = 1;
-  createInfo.arrayLayers = 1;
-  createInfo.format = _format;
-  createInfo.tiling = _tiling;
-  createInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  createInfo.usage = _usage;
-  createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  createInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-  createInfo.flags = 0;
-
-  SKL_ASSERT_VK(
-      vkCreateImage(vulkanContext.device, &createInfo, nullptr, &_image),
-      "Failed to create texture image");
-
-  VkMemoryRequirements memRequirements;
-  vkGetImageMemoryRequirements(vulkanContext.device, _image, &memRequirements);
-
-  VkMemoryAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = bufferManager->FindMemoryType(
-    memRequirements.memoryTypeBits,
-    _memFlags);
-
-  SKL_ASSERT_VK(
-      vkAllocateMemory(vulkanContext.device, &allocInfo, nullptr, &_memory),
-      "Failed to allocate texture memory");
-
-  vkBindImageMemory(vulkanContext.device, _image, _memory, 0);
+  return ImageManager::CreateImage(_width, _height, _format, _tiling, _usage, _memFlags);
 }
 
-VkImageView SklRendererBackend::CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
-                                                const VkImage& _image)
+VkImageView SklRenderBackend::CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
+                                              const VkImage& _image)
 {
   VkImageViewCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -955,14 +656,14 @@ VkImageView SklRendererBackend::CreateImageView(const VkFormat _format, VkImageA
   return tmpView;
 }
 
-VkFormat SklRendererBackend::FindDepthFormat()
+VkFormat SklRenderBackend::FindDepthFormat()
 {
   return FindSupportedFormat(
       { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
       VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
-VkFormat SklRendererBackend::FindSupportedFormat(const std::vector<VkFormat>& _candidates,
+VkFormat SklRenderBackend::FindSupportedFormat(const std::vector<VkFormat>& _candidates,
                                                  VkImageTiling _tiling,
                                                  VkFormatFeatureFlags _features)
 {

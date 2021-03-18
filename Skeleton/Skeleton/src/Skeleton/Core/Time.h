@@ -1,6 +1,6 @@
 
 #ifndef SKELETON_CORE_TIME_H
-#define SKELETON_CORE_TIME_H
+#define SKELETON_CORE_TIME_H 1
 
 // TODO : Move to a managed class/struct
 // Stores all application time information

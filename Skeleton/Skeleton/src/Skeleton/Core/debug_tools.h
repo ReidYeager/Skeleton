@@ -6,7 +6,7 @@
 // TODO : Replace this file with a more permanent debug/logging system
 
 #ifndef SKELETON_CORE_DEBUG_TOOLS_H
-#define SKELETON_CORE_DEBUG_TOOLS_H
+#define SKELETON_CORE_DEBUG_TOOLS_H 1
 
 #define SKL_DEBUG "SKL_DEBUG"
 #define SKL_ERROR "SKL_ERROR"

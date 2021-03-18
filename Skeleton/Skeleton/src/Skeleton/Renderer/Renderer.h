@@ -7,11 +7,11 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-#include "Skeleton/Renderer/RendererBackend.h"
-#include "Skeleton/Core/Camera.h"
+#include "skeleton/renderer/render_backend.h"
+#include "skeleton/core/camera.h"
 
 #ifndef SKELETON_RENDERER_RENDERER_H
-#define SKELETON_RENDERER_RENDERER_H
+#define SKELETON_RENDERER_RENDERER_H 1
 
 class Renderer
 {
@@ -19,7 +19,7 @@ class Renderer
   // Variables
   //=================================================
 public:
-  SklRendererBackend* backend;
+  SklRenderBackend* backend;
   BufferManager* bufferManager;
 
   // Transformation matrices for objects
@@ -80,7 +80,7 @@ protected:
 
   // Loads image from file to a texture
   void CreateTextureImage(const char* _directory, VkImage& _image, VkImageView& _view,
-                          VkDeviceMemory& _memory, VkSampler& _sampler);
+                                 VkDeviceMemory& _memory, VkSampler& _sampler);
 
   // Creates a generic imageSampler
   VkSampler CreateSampler();

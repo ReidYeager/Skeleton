@@ -1,13 +1,13 @@
 
 #include "pch.h"
-#include "Skeleton/Core/Application.h"
+#include "skeleton/core/application.h"
 
 #include <stdio.h>
 #include <chrono>
 
-#include "Skeleton/Core/DebugTools.h"
-#include "Skeleton/Core/Time.h"
-#include "Skeleton/Core/FileSystem.h"
+#include "skeleton/core/debug_tools.h"
+#include "skeleton/core/time.h"
+#include "skeleton/core/file_system.h"
 
 void Application::Run()
 {
@@ -16,14 +16,14 @@ void Application::Run()
   Cleanup();
 }
 
-void Application::CreateObject(const char* _meshDirectory, uint32_t _parProgIndex)
+void Application::CreateObject(const char* _meshDirectory, uint32_t _shaderProgramIndex)
 {
   mesh_t m = CreateMesh(_meshDirectory);
 
-  // Creates a renderable from mesh & parprog
-  vulkanContext.renderables.push_back({m, _parProgIndex});
+  // Creates a renderable from mesh & ShaderProgram
+  vulkanContext.renderables.push_back({m, _shaderProgramIndex});
 
-  renderer->CreateDescriptorSet(vulkanContext.parProgs[_parProgIndex],
+  renderer->CreateDescriptorSet(vulkanContext.shaderPrograms[_shaderProgramIndex],
                                 vulkanContext.renderables[vulkanContext.renderables.size() - 1]);
 }
 
@@ -44,10 +44,10 @@ void Application::Init()
     throw "SDL failure";
   }
 
-  uint32_t sdlFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_INPUT_FOCUS
-    | SDL_WINDOW_RESIZABLE;
+  uint32_t sdlFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_INPUT_FOCUS |
+                      SDL_WINDOW_RESIZABLE;
   window = SDL_CreateWindow("Skeleton Application", SDL_WINDOWPOS_UNDEFINED,
-    SDL_WINDOWPOS_UNDEFINED, 800, 600, sdlFlags);
+                            SDL_WINDOWPOS_UNDEFINED, 800, 600, sdlFlags);
   SDL_SetRelativeMouseMode(SDL_TRUE);
   SDL_SetWindowGrab(window, SDL_TRUE);
 
@@ -86,25 +86,28 @@ void Application::MainLoop()
 
   uint32_t FPSCap = -1;
   uint32_t FPSPrintIndex = 0;
-  float deltaSum = 0.0f;
-  uint32_t deltaCount = 0;
+  float deltaSum = 0.001f;
+  uint32_t deltaCount = 1;
+
+  char titleBuffer[255];
+  int titleBufferSize = 0;
 
   while (!appShouldClose)
   {
     auto curTime = std::chrono::high_resolution_clock::now();
     sklTime.totalTime = std::chrono::duration<float, std::chrono::seconds::period>
-      (curTime - startTime).count();
+        (curTime - startTime).count();
     sklTime.deltaTime = std::chrono::duration<float, std::chrono::seconds::period>
-      (curTime - prevTime).count();
+        (curTime - prevTime).count();
 
     // FPS cap
     while (FPSCap != -1 && sklTime.deltaTime < (1.f / FPSCap))
     {
       curTime = std::chrono::high_resolution_clock::now();
       sklTime.totalTime = std::chrono::duration<float, std::chrono::seconds::period>
-        (curTime - startTime).count();
+          (curTime - startTime).count();
       sklTime.deltaTime = std::chrono::duration<float, std::chrono::seconds::period>
-        (curTime - prevTime).count();
+          (curTime - prevTime).count();
     }
 
     // Poll and handle SDL events
@@ -160,9 +163,12 @@ void Application::MainLoop()
       float avgFPS = deltaSum / deltaCount;
 
       SKL_PRINT_SLIM("%6.0f sec, %4.2f ms average, Frame# %6u, %4.2f FPS", sklTime.totalTime,
-        avgFPS * 1000.f, sklTime.frameCount, 1.f / avgFPS);
-      FPSPrintIndex++;
+                     avgFPS * 1000.f, sklTime.frameCount, 1.f / avgFPS);
+      titleBufferSize = sprintf_s(titleBuffer, 255, "Skeleton :==: %4.2f ms :==: %4.2f FPS",
+                                  avgFPS * 1000.0f, 1.0f / avgFPS);
+      SDL_SetWindowTitle(window, titleBuffer);
 
+      FPSPrintIndex++;
       deltaSum = 0;
       deltaCount = 0;
     }

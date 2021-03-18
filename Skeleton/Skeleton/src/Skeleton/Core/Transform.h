@@ -1,8 +1,9 @@
+
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 
 #ifndef SKELETON_CORE_TRANSFORM_H
-#define SKELETON_CORE_TRANSFORM_H
+#define SKELETON_CORE_TRANSFORM_H 1
 
 struct Transform
 {

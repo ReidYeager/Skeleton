@@ -1,7 +1,7 @@
 
 #include <iostream>
 
-#include "Skeleton.h"
+#include "skeleton.h"
 
 // TODO : Implement shader layout file handling
 // TODO : Define shader files/directory
@@ -51,6 +51,7 @@ int main(int argc, char* argv[])
     std::cout << "Caught: " << e << "\n";
   }
 
+  system("PAUSE");
   return 0;
 }
 

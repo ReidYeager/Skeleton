@@ -8,12 +8,12 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tinyobjloader/tiny_obj_loader.h"
 
-#include "Skeleton/Core/DebugTools.h"
-#include "Skeleton/Core/Time.h"
-#include "Skeleton/Renderer/RendererBackend.h"
+#include "skeleton/core/debug_tools.h"
+#include "skeleton/core/time.h"
+#include "skeleton/renderer/render_backend.h"
 
 #ifndef SKELETON_CORE_FILE_SYSTEM_H
-#define SKELETON_CORE_FILE_SYSTEM_H
+#define SKELETON_CORE_FILE_SYSTEM_H 1
 
 // Loads a file's binary as a char array
 inline std::vector<char> LoadFile(const char* _directory)

@@ -1,10 +1,10 @@
 
 #include <vector>
 
-#include "Skeleton/Core/Vertex.h"
+#include "skeleton/core/vertex.h"
 
 #ifndef SKELETON_CORE_MESH_H
-#define SKELETON_CORE_MESH_H
+#define SKELETON_CORE_MESH_H 1
 
 // Indexed mesh
 struct mesh_t

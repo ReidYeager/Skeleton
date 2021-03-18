@@ -21,43 +21,49 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Application.h">
+    <ClInclude Include="src\Skeleton\Core\application.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\Renderer.h">
+    <ClInclude Include="src\skeleton\renderer\renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\DebugTools.h">
+    <ClInclude Include="src\Skeleton\Core\debug_tools.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton.h">
+    <ClInclude Include="src\skeleton.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Vertex.h">
+    <ClInclude Include="src\Skeleton\Core\vertex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Camera.h">
+    <ClInclude Include="src\Skeleton\Core\camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Transform.h">
+    <ClInclude Include="src\Skeleton\Core\transform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Time.h">
+    <ClInclude Include="src\Skeleton\Core\time.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\FileSystem.h">
+    <ClInclude Include="src\Skeleton\Core\file_system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\ShaderProgram.h">
+    <ClInclude Include="src\skeleton\renderer\shader_program.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h">
+    <ClInclude Include="src\skeleton\renderer\render_backend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Renderer\Image.h">
+    <ClInclude Include="src\Skeleton\Core\mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Skeleton\Core\Mesh.h">
+    <ClInclude Include="src\Skeleton\Renderer\resource_managers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\skeleton\renderer\vulkan_context.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\skeleton\renderer\image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -65,16 +71,19 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp">
+    <ClCompile Include="src\skeleton\renderer\renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Core\Application.cpp">
+    <ClCompile Include="src\Skeleton\Core\application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\ShaderProgram.cpp">
+    <ClCompile Include="src\skeleton\renderer\shader_program.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp">
+    <ClCompile Include="src\skeleton\renderer\render_backend.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Skeleton\Renderer\resource_managers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

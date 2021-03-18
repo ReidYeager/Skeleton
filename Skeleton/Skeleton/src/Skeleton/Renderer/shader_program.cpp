@@ -1,12 +1,13 @@
 
 #include "pch.h"
-#include "Skeleton/Renderer/ShaderProgram.h"
+#include "skeleton/renderer/shader_program.h"
 
 #include <string>
+#include <inttypes.h>
 
-#include "Skeleton/Renderer/RendererBackend.h"
-#include "Skeleton/Core/FileSystem.h"
-#include "Skeleton/Core/Vertex.h"
+#include "skeleton/renderer/render_backend.h"
+#include "skeleton/core/file_system.h"
+#include "skeleton/core/vertex.h"
 
 VkPipeline shaderProgram_t::GetPipeline(VkShaderModule _vertMod, VkShaderModule _fragMod)
 {
@@ -20,25 +21,26 @@ VkPipeline shaderProgram_t::GetPipeline(VkShaderModule _vertMod, VkShaderModule 
 }
 
 uint32_t GetShaderProgram(const char* _name, sklShaderStageFlags _stages,
-                          uint64_t _pipelineSettings /*= 1*/)
+                          uint64_t _pipelineSettings /*= Skl_Pipeline_Default_Settings*/)
 {
-  for (uint32_t i = 0; i < vulkanContext.parProgs.size(); i++)
+  for (uint32_t i = 0; i < vulkanContext.shaderPrograms.size(); i++)
   {
-    shaderProgram_t& prog = vulkanContext.parProgs[i];
+    shaderProgram_t& prog = vulkanContext.shaderPrograms[i];
     if (prog.pipelineSettingsFlags == _pipelineSettings && std::strcmp(_name, prog.name) == 0)
     {
       return i;
     }
   }
 
-  uint32_t index = static_cast<uint32_t>(vulkanContext.parProgs.size());
-  SKL_PRINT_SIMPLE("Creating new program for %s -- %u", _name, index);
+  uint32_t index = static_cast<uint32_t>(vulkanContext.shaderPrograms.size());
+  SKL_PRINT_SIMPLE("Creating new program for \"%s\"(%"PRIu64") at %u",
+                   _name, _pipelineSettings, index);
   CreateShaderProgram(_name, _stages, _pipelineSettings);
   return index;
 }
 
 void CreateShaderProgram(const char* _name, sklShaderStageFlags _stages,
-                         uint64_t _pipelineSettings /*= 1*/)
+                         uint64_t _pipelineSettings /*= Skl_Pipeline_Default_Settings*/)
 {
   uint32_t vertIdx = -1;
   if (_stages & Skl_Shader_Vert_Stage)
@@ -57,7 +59,7 @@ void CreateShaderProgram(const char* _name, sklShaderStageFlags _stages,
   prog.vertIdx = vertIdx;
   prog.fragIdx = fragIdx;
   CreateDescriptorSetLayout(prog);
-  vulkanContext.parProgs.push_back(prog);
+  vulkanContext.shaderPrograms.push_back(prog);
 }
 
 VkPipeline CreatePipeline(VkShaderModule _vertModule, VkShaderModule _fragModule,
@@ -121,10 +123,10 @@ VkPipeline CreatePipeline(VkShaderModule _vertModule, VkShaderModule _fragModule
 
   switch (_pipelineSettings & Skl_Cull_Mode_Bits)
   {
-  case Skl_Cull_Mode_None: rasterStateInfo.cullMode = VK_CULL_MODE_NONE; break;
-  case Skl_Cull_Mode_Back: rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT; break;
-  case Skl_Cull_Mode_Front: rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_BIT; break;
-  case Skl_Cull_Mode_Both: rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_AND_BACK; break;
+  case Skl_Cull_Mode_None:  rasterStateInfo.cullMode = VK_CULL_MODE_NONE;           break;
+  case Skl_Cull_Mode_Back:  rasterStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;       break;
+  case Skl_Cull_Mode_Front: rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;      break;
+  case Skl_Cull_Mode_Both:  rasterStateInfo.cullMode = VK_CULL_MODE_FRONT_AND_BACK; break;
   }
 
   // Multisample State
@@ -375,7 +377,7 @@ void CreateDescriptorSetLayout(shaderProgram_t& _program)
   createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   createInfo.bindingCount = static_cast<uint32_t>(bindings.size());
   createInfo.pBindings = bindings.data();
-  SKL_PRINT("ParProg", "%s has %u bindings", _program.name,
+  SKL_PRINT("ShaderProgram", "%s has %u bindings", _program.name,
             static_cast<uint32_t>(bindings.size()));
 
   SKL_ASSERT_VK(vkCreateDescriptorSetLayout(vulkanContext.device, &createInfo,

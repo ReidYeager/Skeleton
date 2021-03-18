@@ -1,6 +1,6 @@
 
 #include "pch.h"
-#include "Skeleton/Renderer/Renderer.h"
+#include "skeleton/renderer/renderer.h"
 
 #include <set>
 #include <string>
@@ -8,17 +8,17 @@
 
 #include "stb/stb_image.h"
 
-#include "Skeleton/Renderer/RendererBackend.h"
-#include "Skeleton/Core/DebugTools.h"
-#include "Skeleton/Core/Time.h"
-#include "Skeleton/Core/FileSystem.h"
-#include "Skeleton/Core/Vertex.h"
-#include "Skeleton/Renderer/ShaderProgram.h"
-#include "Skeleton/Core/Mesh.h"
+#include "skeleton/renderer/render_backend.h"
+#include "skeleton/core/debug_tools.h"
+#include "skeleton/core/time.h"
+#include "skeleton/core/file_system.h"
+#include "skeleton/core/vertex.h"
+#include "skeleton/renderer/shader_program.h"
+#include "skeleton/core/mesh.h"
 
 Renderer::Renderer(const std::vector<const char*>& _extraExtensions, SDL_Window* _window)
 {
-  backend = new SklRendererBackend(_window, _extraExtensions);
+  backend = new SklRenderBackend(_window, _extraExtensions);
   bufferManager = backend->bufferManager;
 }
 
@@ -143,7 +143,7 @@ void Renderer::CreateDescriptorSet(shaderProgram_t& _prog, sklRenderable_t& _ren
     {
       sklImage_t* imageA = new sklImage_t();
       CreateTextureImage(((i % 2 == 0) ? "res/AltImage.png" : "res/TestImage.png"),
-                         imageA->image, imageA->view, imageA->memory, imageA->sampler);
+        imageA->image, imageA->view, imageA->memory, imageA->sampler);
       uint32_t rendImageIdx = static_cast<uint32_t>(_renderable.images.size());
       _renderable.images.push_back(imageA);
 
@@ -202,7 +202,7 @@ void Renderer::RecreateRenderer()
 
 void Renderer::RecordCommandBuffers()
 {
-  shaderProgram_t* parProg;
+  shaderProgram_t* shaderProgram;
 
   uint32_t comandCount = static_cast<uint32_t>(backend->commandBuffers.size());
   VkCommandBufferBeginInfo beginInfo = {};
@@ -232,14 +232,16 @@ void Renderer::RecordCommandBuffers()
     // TODO : Only bind pipelines once
     for (uint32_t j = 0; j < vulkanContext.renderables.size(); j++)
     {
-      parProg = &vulkanContext.parProgs[vulkanContext.renderables[j].parProgIndex];
+      shaderProgram =
+          &vulkanContext.shaderPrograms[vulkanContext.renderables[j].shaderProgramIndex];
       vkCmdBindPipeline(
         backend->commandBuffers[i],
         VK_PIPELINE_BIND_POINT_GRAPHICS,
-        parProg->GetPipeline(vulkanContext.shaders[parProg->vertIdx].module,
-                             vulkanContext.shaders[parProg->fragIdx].module));
+        shaderProgram->GetPipeline(vulkanContext.shaders[shaderProgram->vertIdx].module,
+                             vulkanContext.shaders[shaderProgram->fragIdx].module));
       vkCmdBindDescriptorSets(backend->commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              parProg->pipelineLayout, 0, 1, &parProg->descriptorSet, 0, nullptr);
+                              shaderProgram->pipelineLayout, 0, 1, &shaderProgram->descriptorSet,
+                              0, nullptr);
       VkDeviceSize offset[] = { 0 };
 
       mesh_t& mesh = vulkanContext.renderables[j].mesh;
@@ -277,7 +279,7 @@ void Renderer::CreateTextureImage(const char* _directory, VkImage& _image, VkIma
   // Image loading
   //=================================================
   int width, height;
-  void* img = LoadImageFile(_directory, width, height);
+  void* imageFile = LoadImageFile(_directory, width, height);
   VkDeviceSize size = width * height * 4;
 
   // Staging buffer
@@ -286,33 +288,39 @@ void Renderer::CreateTextureImage(const char* _directory, VkImage& _image, VkIma
   VkBuffer stagingBuffer;
 
   uint32_t stagingIndex = bufferManager->CreateBuffer(
-      stagingBuffer, stagingMemory, size,
-      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+      stagingBuffer, stagingMemory, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-  bufferManager->FillBuffer(stagingMemory, img, size);
+  bufferManager->FillBuffer(stagingMemory, imageFile, size);
 
-  DestroyImageFile(img);
+  DestroyImageFile(imageFile);
 
   // Image creation
   //=================================================
-  backend->CreateImage(static_cast<uint32_t>(width), static_cast<uint32_t>(height),
-                       VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                       VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _image, _memory);
+  uint32_t imageIdx = ImageManager::CreateImage(
+      static_cast<uint32_t>(width), static_cast<uint32_t>(height), VK_FORMAT_R8G8B8A8_UNORM,
+      VK_IMAGE_TILING_OPTIMAL,VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-  TransitionImageLayout(_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
+  sklImage_t* img = ImageManager::images[imageIdx];
+
+  TransitionImageLayout(img->image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  CopyBufferToImage(stagingBuffer, _image, static_cast<uint32_t>(width),
+  CopyBufferToImage(stagingBuffer, img->image, static_cast<uint32_t>(width),
                     static_cast<uint32_t>(height));
-  TransitionImageLayout(_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+  TransitionImageLayout(img->image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   bufferManager->RemoveAtIndex(stagingIndex);
 
-  _view = backend->CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, _image);
+  img->view = backend->CreateImageView(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, img->image);
 
-  _sampler = CreateSampler();
+  img->sampler = CreateSampler();
+
+  _image = img->image;
+  _view = img->view;
+  _memory = img->memory;
+  _sampler = img->sampler;
 }
 
 VkSampler Renderer::CreateSampler()
@@ -347,13 +355,10 @@ VkSampler Renderer::CreateSampler()
   return tmpSampler;
 }
 
-void Renderer::TransitionImageLayout(
-  VkImage _iamge,
-  VkFormat _format,
-  VkImageLayout _oldLayout,
-  VkImageLayout _newLayout)
+void Renderer::TransitionImageLayout(VkImage _image, VkFormat _format, VkImageLayout _oldLayout,
+                                     VkImageLayout _newLayout)
 {
-  VkCommandBuffer transitionCommand = BeginSingleTimeCommand(backend->graphicsCommandPool);
+  VkCommandBuffer transitionCommand = vulkanContext.BeginSingleTimeCommand(backend->graphicsCommandPool);
 
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -361,7 +366,7 @@ void Renderer::TransitionImageLayout(
   barrier.newLayout = _newLayout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = _iamge;
+  barrier.image = _image;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.baseMipLevel = 0;
@@ -398,14 +403,14 @@ void Renderer::TransitionImageLayout(
   vkCmdPipelineBarrier(transitionCommand, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1,
                        &barrier);
 
-  EndSingleTimeCommand(transitionCommand, backend->graphicsCommandPool,
-                       vulkanContext.graphicsQueue);
+  vulkanContext.EndSingleTimeCommand(transitionCommand, backend->graphicsCommandPool,
+                                     vulkanContext.graphicsQueue);
 }
 
 void Renderer::CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width,
                                  uint32_t _height)
 {
-  VkCommandBuffer command = BeginSingleTimeCommand(bufferManager->transientPool);
+  VkCommandBuffer command = vulkanContext.BeginSingleTimeCommand(bufferManager->transientPool);
 
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
@@ -428,6 +433,6 @@ void Renderer::CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _wid
     1,
     &region);
 
-  EndSingleTimeCommand(command, bufferManager->transientPool, vulkanContext.transferQueue);
+  vulkanContext.EndSingleTimeCommand(command, bufferManager->transientPool, vulkanContext.transferQueue);
 }
 

@@ -2,10 +2,10 @@
 #include "sdl/SDL.h"
 #include "sdl/SDL_vulkan.h"
 
-#include "Skeleton/Renderer/Renderer.h"
+#include "skeleton/renderer/renderer.h"
 
 #ifndef SKELETON_CORE_APPLICATION_H
-#define SKELETON_CORE_APPLICATION_H
+#define SKELETON_CORE_APPLICATION_H 1
 
 // Abstract class to handle project-independent boilerplate
 // Bridge for all Game/Engine communication
@@ -19,6 +19,8 @@ protected:
   bool appShouldClose = false;
 
   Renderer* renderer;
+  // InputManager
+  // AudioManager
 
   // TODO : Remove from Application.h
   // Model-View-Projection matrices for model-to-screenspace transformations
@@ -43,7 +45,7 @@ protected:
   virtual void CoreLoop() = 0;
 
   // Creates and binds a renderable in the renderer
-  void CreateObject(const char* _meshDirectory, uint32_t _shaderIndex);
+  void CreateObject(const char* _meshDirectory, uint32_t _shaderProgramIndex);
   // Loads an obj file and creates a renderable mesh
   mesh_t CreateMesh(const char* _directory);
   // Binds a renderable in the renderer

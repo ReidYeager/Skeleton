@@ -189,19 +189,21 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="src\Skeleton\Core\Application.h" />
-    <ClInclude Include="src\Skeleton\Core\FileSystem.h" />
-    <ClInclude Include="src\Skeleton\Core\Camera.h" />
-    <ClInclude Include="src\Skeleton\Core\DebugTools.h" />
-    <ClInclude Include="src\Skeleton\Core\Mesh.h" />
-    <ClInclude Include="src\Skeleton\Core\Time.h" />
-    <ClInclude Include="src\Skeleton\Core\Transform.h" />
-    <ClInclude Include="src\Skeleton\Core\Vertex.h" />
-    <ClInclude Include="src\Skeleton\Renderer\Image.h" />
-    <ClInclude Include="src\Skeleton\Renderer\ShaderProgram.h" />
-    <ClInclude Include="src\Skeleton\Renderer\Renderer.h" />
-    <ClInclude Include="src\Skeleton.h" />
-    <ClInclude Include="src\Skeleton\Renderer\RendererBackend.h" />
+    <ClInclude Include="src\Skeleton\Renderer\resource_managers.h" />
+    <ClInclude Include="src\Skeleton\Core\application.h" />
+    <ClInclude Include="src\Skeleton\Core\file_system.h" />
+    <ClInclude Include="src\Skeleton\Core\camera.h" />
+    <ClInclude Include="src\Skeleton\Core\debug_tools.h" />
+    <ClInclude Include="src\Skeleton\Core\mesh.h" />
+    <ClInclude Include="src\Skeleton\Core\time.h" />
+    <ClInclude Include="src\Skeleton\Core\transform.h" />
+    <ClInclude Include="src\Skeleton\Core\vertex.h" />
+    <ClInclude Include="src\skeleton\renderer\shader_program.h" />
+    <ClInclude Include="src\skeleton\renderer\renderer.h" />
+    <ClInclude Include="src\skeleton.h" />
+    <ClInclude Include="src\skeleton\renderer\render_backend.h" />
+    <ClInclude Include="src\skeleton\renderer\image.h" />
+    <ClInclude Include="src\skeleton\renderer\vulkan_context.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -210,10 +212,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\Skeleton\Core\Application.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\ShaderProgram.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\Renderer.cpp" />
-    <ClCompile Include="src\Skeleton\Renderer\RendererBackend.cpp" />
+    <ClCompile Include="src\Skeleton\Renderer\resource_managers.cpp" />
+    <ClCompile Include="src\Skeleton\Core\application.cpp" />
+    <ClCompile Include="src\skeleton\renderer\shader_program.cpp" />
+    <ClCompile Include="src\skeleton\renderer\renderer.cpp" />
+    <ClCompile Include="src\skeleton\renderer\render_backend.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

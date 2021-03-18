@@ -1,6 +1,10 @@
-#pragma once
 
-#include "Skeleton/Core/DebugTools.h"
-#include "Skeleton/Core/Application.h"
-#include "Skeleton/Renderer/Renderer.h"
+#ifndef SKELETON_H
+#define SKELETON_H 1
+
+#include "skeleton/core/debug_tools.h"
+#include "skeleton/core/application.h"
+#include "skeleton/renderer/renderer.h"
+
+#endif // !SKELETON_H
 

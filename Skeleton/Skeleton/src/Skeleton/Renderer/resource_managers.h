@@ -1,12 +1,14 @@
 
+#ifndef SKELETON_RDNERER_RESOURCE_MANAGERS_H
+#define SKELETON_RDNERER_RESOURCE_MANAGERS_H 1
+
 #include <vector>
 
 #include "vulkan/vulkan.h"
 
 #include "skeleton/renderer/vulkan_context.h"
 
-#ifndef SKELETON_RDNERER_RESOURCE_MANAGERS_H
-#define SKELETON_RDNERER_RESOURCE_MANAGERS_H 1
+// TODO : Make resource managers singletons rather than static classes?
 
 // TODO : Handle buffer memory better
 // Handles the life of VkBuffers and their memory
@@ -22,7 +24,7 @@ private:
   std::vector<VkDeviceMemory> m_memories;
 
 public:
-  VkCommandPool transientPool; // Used for single-time commands
+  static VkCommandPool transientPool; // Used for single-time commands
 
   //=================================================
   // Functions
@@ -51,8 +53,7 @@ public:
   uint32_t GetFirstAvailableIndex();
 
   // Creates a new buffer and fills its memory
-  uint32_t CreateAndFillBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory, const void* _data,
-    VkDeviceSize size, VkBufferUsageFlags _usage);
+  uint32_t CreateAndFillBuffer(const void* _data, VkDeviceSize size, VkBufferUsageFlags _usage);
 
   // Creates a new buffer and allocates its memory, returns the buffer and memory
   uint32_t CreateBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory, VkDeviceSize _size,
@@ -67,6 +68,9 @@ public:
   void CopyBuffer(VkBuffer _src, VkBuffer _dst, VkDeviceSize _size);
   // Finds the first memory property that fits input criteria
   static uint32_t FindMemoryType(uint32_t _mask, VkMemoryPropertyFlags _flags);
+  // Copies a VkBuffer to a VkImage
+  static void CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width,
+                                uint32_t _height);
 
 }; // BufferManager
 
@@ -82,16 +86,25 @@ public:
   static uint32_t CreateImage(uint32_t _width, uint32_t _height, VkFormat _format,
                               VkImageTiling _tiling, VkImageUsageFlags _usage,
                               VkMemoryPropertyFlags _memFlags);
+  // Changes the ImageLayout of an image via a commandBuffer
+  static void TransitionImageLayout(VkImage _image, VkFormat _format, VkImageLayout _oldLayout,
+                                    VkImageLayout _newLayout);
+  // TODO : Add view creation settings (Mip levels, multi-layer, etc.)
+  // Creates a basic imageView
+  static VkImageView CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
+                                     const VkImage& _image);
+  // Creates a generic imageSampler
+  static VkSampler CreateSampler();
 };
 
-//class TextureManager
-//{
-//public:
-//  static std::vector<sklTexture_t*> textures;
-//
-//public:
-//  static uint32_t CreateTexture(const char* _directory);
-//};
+class TextureManager
+{
+public:
+  static std::vector<sklTexture_t*> textures;
+
+public:
+  static uint32_t CreateTexture(const char* _directory, BufferManager* bufferManager);
+};
 
 #endif // !SKELETON_RDNERER_RESOURCE_MANAGERS_H
 

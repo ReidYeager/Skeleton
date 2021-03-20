@@ -1,11 +1,11 @@
 
+#ifndef SKELETON_CORE_APPLICATION_H
+#define SKELETON_CORE_APPLICATION_H 1
+
 #include "sdl/SDL.h"
 #include "sdl/SDL_vulkan.h"
 
 #include "skeleton/renderer/renderer.h"
-
-#ifndef SKELETON_CORE_APPLICATION_H
-#define SKELETON_CORE_APPLICATION_H 1
 
 // Abstract class to handle project-independent boilerplate
 // Bridge for all Game/Engine communication

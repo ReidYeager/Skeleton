@@ -1,4 +1,7 @@
 
+#ifndef SKELETON_RENDERER_RENDER_BACKEND_H
+#define SKELETON_RENDERER_RENDER_BACKEND_H 1
+
 #include <vector>
 
 #include "vulkan/vulkan.h"
@@ -11,9 +14,6 @@
 #include "skeleton/renderer/shader_program.h"
 #include "skeleton/renderer/resource_managers.h"
 #include "skeleton/core/mesh.h"
-
-#ifndef SKELETON_RENDERER_RENDER_BACKEND_H
-#define SKELETON_RENDERER_RENDER_BACKEND_H 1
 
 // Holds the MVP matrix of a camera and all the objects it should render
 struct sklView_t
@@ -110,7 +110,6 @@ public:
   std::vector<VkSemaphore> imageAvailableSemaphores;
   uint32_t currentFrame = 0;
 
-  VkCommandPool graphicsCommandPool;
   std::vector<VkCommandBuffer> commandBuffers;
 
 public:
@@ -165,20 +164,12 @@ public:
 
   // Returns the first instance of a queue with the input flags
   uint32_t GetQueueIndex(std::vector<VkQueueFamilyProperties>& _queues, VkQueueFlags _flags);
-
   // Returns the first instance of a presentation queue
   uint32_t GetPresentIndex(const VkPhysicalDevice* _device, uint32_t _queuePropertyCount,
                            uint32_t _graphicsIndex);
-
   // Creates and binds an image and its memory
   uint32_t CreateImage(uint32_t _width, uint32_t _height, VkFormat _format, VkImageTiling _tiling,
                        VkImageUsageFlags _usage, VkMemoryPropertyFlags _memFlags);
-
-  // TODO : Add view creation settings (Mip levels, multi-layer, etc.)
-  // Creates a basic imageView
-  VkImageView CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
-                              const VkImage& _image);
-
   // Find the first supported format for a depth image
   VkFormat FindDepthFormat();
   // Find the first specified format supported

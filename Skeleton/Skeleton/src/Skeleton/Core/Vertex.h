@@ -1,4 +1,7 @@
 
+#ifndef SKELETON_CORE_VERTEX_H
+#define SKELETON_CORE_VERTEX_H 1
+
 #include <vector>
 
 #include <iostream>
@@ -14,9 +17,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtx/hash.hpp"
 #include "vulkan/vulkan.h"
-
-#ifndef SKELETON_CORE_VERTEX_H
-#define SKELETON_CORE_VERTEX_H 1
 
 // Per-vertex information used to build and render meshes
 struct vertex_t

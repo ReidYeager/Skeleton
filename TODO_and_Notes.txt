@@ -1,31 +1,30 @@
 \Skeleton\Sandbox\main.cpp
-	 TODO :--: Line     5 :--: // TODO : Implement shader layout file handling
-	 TODO :--: Line     6 :--: // TODO : Define shader files/directory
+	 TODO :--: Line     5 :--: // TODO : Define shader files/directory
 \Skeleton\Skeleton\src\skeleton\core\application.cpp
 	 TODO :--: Line   130 :--: // TODO : Create a proper input system and move this to Main's Application
 \Skeleton\Skeleton\src\skeleton\core\application.h
 	 TODO :--: Line    24 :--: // TODO : Remove from Application.h
 	 NOTE :--: Line    38 :--: // NOTE : Add a force quit/restart?
 \Skeleton\Skeleton\src\skeleton\core\debug_tools.h
-	 TODO :--: Line     5 :--: // TODO : Replace this file with a more permanent debug/logging system
-\Skeleton\Skeleton\src\skeleton\core\mesh.h
-	 TODO :--: Line    19 :--: // TODO : Utilize a BufferManager for mesh data
+	 TODO :--: Line     8 :--: // TODO : Replace this file with a more permanent debug/logging system
 \Skeleton\Skeleton\src\skeleton\core\time.h
 	 TODO :--: Line     4 :--: // TODO : Move to a managed class/struct
 \Skeleton\Skeleton\src\skeleton\core\vertex.h
 	 TODO :--: Line    69 :--: // TODO : Make a better hash function http://www.azillionmonkeys.com/qed/hash.html
 \Skeleton\Skeleton\src\skeleton\renderer\renderer.cpp
 	 TODO :--: Line   231 :--: // TODO : Only bind pipelines once
-	 TODO :--: Line   344 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
 \Skeleton\Skeleton\src\skeleton\renderer\renderer.h
 	 TODO :--: Line    31 :--: // TODO : Move to an Object class
 	 TODO :--: Line    35 :--: // TODO : Move to the Main Application
 	 TODO :--: Line    70 :--: // TODO : Remove when Objects have individual MVP buffers/push-constants
 \Skeleton\Skeleton\src\skeleton\renderer\render_backend.h
 	 TODO :--: Line    87 :--: // TODO : Find a way to remove SDL window from Create(instance/swapchain)
-	 TODO :--: Line   176 :--: // TODO : Add view creation settings (Mip levels, multi-layer, etc.)
+\Skeleton\Skeleton\src\skeleton\renderer\resource_managers.cpp
+	 TODO :--: Line   465 :--: // TODO : Make this conditional based on the physicalDevice's capabilities
 \Skeleton\Skeleton\src\skeleton\renderer\resource_managers.h
-	 TODO :--: Line    10 :--: // TODO : Handle buffer memory better
+	 TODO :--: Line    10 :--: // TODO : Make resource managers singletons rather than static classes?
+	 TODO :--: Line    12 :--: // TODO : Handle buffer memory better
+	 TODO :--: Line    91 :--: // TODO : Add view creation settings (Mip levels, multi-layer, etc.)
 \Skeleton\Skeleton\src\skeleton\renderer\shader_program.cpp
 	 TODO :--: Line   279 :--: // TODO : Make this function a lot more robust
 \Skeleton\Skeleton\src\skeleton\renderer\shader_program.h

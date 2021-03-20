@@ -10,6 +10,9 @@
 //=================================================
 
 #pragma region BufferManager
+
+VkCommandPool BufferManager::transientPool;
+
 BufferManager::BufferManager()
 {
   VkCommandPoolCreateInfo createInfo = {};
@@ -103,9 +106,8 @@ uint32_t BufferManager::GetFirstAvailableIndex()
   return -1;
 }
 
-uint32_t BufferManager::CreateAndFillBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory,
-  const void* _data, VkDeviceSize _size,
-  VkBufferUsageFlags _usage)
+uint32_t BufferManager::CreateAndFillBuffer(const void* _data, VkDeviceSize _size,
+                                            VkBufferUsageFlags _usage)
 {
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingMemory;
@@ -116,18 +118,18 @@ uint32_t BufferManager::CreateAndFillBuffer(VkBuffer& _buffer, VkDeviceMemory& _
 
   FillBuffer(stagingMemory, _data, _size);
 
-  uint32_t index = CreateBuffer(_buffer, _memory, _size, _usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  uint32_t index = CreateBuffer(_size, _usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-  CopyBuffer(stagingBuffer, _buffer, _size);
+  CopyBuffer(stagingBuffer, m_buffers[index], _size);
 
   RemoveAtIndex(stagingBufferIndex);
   return index;
 }
 
 uint32_t BufferManager::CreateBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory,
-  VkDeviceSize _size, VkBufferUsageFlags _usage,
-  VkMemoryPropertyFlags _memProperties)
+                                     VkDeviceSize _size, VkBufferUsageFlags _usage,
+                                     VkMemoryPropertyFlags _memProperties)
 {
   uint32_t index = GetFirstAvailableIndex();
   SetIndexBitMapAt(index);
@@ -182,7 +184,7 @@ uint32_t BufferManager::CreateBuffer(VkBuffer& _buffer, VkDeviceMemory& _memory,
 }
 
 uint32_t BufferManager::CreateBuffer(VkDeviceSize _size, VkBufferUsageFlags _usage,
-  VkMemoryPropertyFlags _memProperties)
+                                     VkMemoryPropertyFlags _memProperties)
 {
   uint32_t index = GetFirstAvailableIndex();
   SetIndexBitMapAt(index);
@@ -273,6 +275,32 @@ uint32_t BufferManager::FindMemoryType(uint32_t _mask, VkMemoryPropertyFlags _fl
     "Failed to find a suitable memory type");
   return 0;
 }
+
+void BufferManager::CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width,
+                                      uint32_t _height)
+{
+  VkCommandBuffer command = vulkanContext.BeginSingleTimeCommand(BufferManager::transientPool);
+
+  VkBufferImageCopy region = {};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageSubresource.baseArrayLayer = 0;
+
+  region.imageOffset = { 0, 0, 0 };
+  region.imageExtent = { _width, _height, 1 };
+
+  vkCmdCopyBufferToImage(command, _buffer, _image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                         &region);
+
+  vulkanContext.EndSingleTimeCommand(command, BufferManager::transientPool,
+                                     vulkanContext.transferQueue);
+}
+
 #pragma endregion
 
 //=================================================
@@ -334,19 +362,184 @@ uint32_t ImageManager::CreateImage(uint32_t _width, uint32_t _height, VkFormat _
   vkBindImageMemory(vulkanContext.device, img->image, img->memory, 0);
   img->format = _format;
   images.push_back(img);
-  SKL_PRINT_SIMPLE("Created image %u", static_cast<uint32_t>(images.size() - 1));
   return static_cast<uint32_t>(images.size() - 1);
+}
+
+void ImageManager::TransitionImageLayout(VkImage _image, VkFormat _format,
+                                         VkImageLayout _oldLayout, VkImageLayout _newLayout)
+{
+  VkCommandBuffer transitionCommand =
+      vulkanContext.BeginSingleTimeCommand(vulkanContext.graphicsCommandPool);
+
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = _oldLayout;
+  barrier.newLayout = _newLayout;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = _image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+
+  VkPipelineStageFlagBits srcStage;
+  VkPipelineStageFlagBits dstStage;
+
+
+  if (_oldLayout == VK_IMAGE_LAYOUT_UNDEFINED
+    && _newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+  {
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  }
+  else if (_oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    && _newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+  {
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  }
+  else
+  {
+    SKL_LOG(SKL_ERROR, "Not a handled image transition");
+  }
+
+  vkCmdPipelineBarrier(transitionCommand, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1,
+    &barrier);
+
+  vulkanContext.EndSingleTimeCommand(transitionCommand, vulkanContext.graphicsCommandPool,
+    vulkanContext.graphicsQueue);
+}
+
+VkImageView ImageManager::CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
+                                          const VkImage& _image)
+{
+  VkImageViewCreateInfo createInfo = {};
+  createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  createInfo.subresourceRange.levelCount = 1;
+  createInfo.subresourceRange.baseMipLevel = 0;
+  createInfo.subresourceRange.layerCount = 1;
+  createInfo.subresourceRange.baseArrayLayer = 0;
+  createInfo.subresourceRange.aspectMask = _aspect;
+  createInfo.image = _image;
+  createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+  createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+  createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+  createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+  createInfo.format = _format;
+
+  VkImageView tmpView;
+  SKL_ASSERT_VK(
+      vkCreateImageView(vulkanContext.device, &createInfo, nullptr, &tmpView),
+      "Failed to create image view");
+
+  return tmpView;
+}
+
+VkSampler ImageManager::CreateSampler()
+{
+  VkSamplerCreateInfo createInfo = {};
+  createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  createInfo.magFilter = VK_FILTER_LINEAR;
+  createInfo.minFilter = VK_FILTER_LINEAR;
+  createInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  createInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  createInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+  createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  createInfo.unnormalizedCoordinates = VK_FALSE;
+  createInfo.compareEnable = VK_FALSE;
+  createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+  createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  createInfo.mipLodBias = 0.0f;
+  createInfo.minLod = 0.0f;
+  createInfo.maxLod = 0.0f;
+
+  // TODO : Make this conditional based on the physicalDevice's capabilities
+  // (Includes physical device selection)
+  createInfo.anisotropyEnable = VK_TRUE;
+  createInfo.maxAnisotropy = vulkanContext.gpu.properties.limits.maxSamplerAnisotropy;
+
+  VkSampler tmpSampler;
+  SKL_ASSERT_VK(
+      vkCreateSampler(vulkanContext.device, &createInfo, nullptr, &tmpSampler),
+      "Failed to create texture sampler");
+
+  return tmpSampler;
 }
 
 //=================================================
 // Texture Manager
 //=================================================
 
-//std::vector<sklTexture_t*> TextureManager::textures;
-//
-//uint32_t TextureManager::CreateTexture(const char* _directory)
-//{
-//  sklTexture_t* tex = new sklTexture_t(_directory);
-//  textures.push_back(tex);
-//  return static_cast<uint32_t>(textures.size() - 1);
-//}
+std::vector<sklTexture_t*> TextureManager::textures;
+
+uint32_t TextureManager::CreateTexture(const char* _directory, BufferManager* _bufferManager)
+{
+  for (uint32_t i = 0; i < textures.size(); i++)
+  {
+    if (std::strcmp(textures[i]->directory, _directory) == 0)
+    {
+      return i;
+    }
+  }
+
+  SKL_PRINT_SIMPLE("Creating a texture from %s", _directory);
+  sklTexture_t* tex = new sklTexture_t(_directory);
+
+  // Image loading
+  //=================================================
+  int width, height;
+  void* imageFile = LoadImageFile(_directory, width, height);
+  VkDeviceSize size = width * height * 4;
+
+  // Staging buffer
+  //=================================================
+  VkDeviceMemory stagingMemory;
+  VkBuffer stagingBuffer;
+
+  uint32_t stagingIndex = _bufferManager->CreateBuffer(
+    stagingBuffer, stagingMemory, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+  _bufferManager->FillBuffer(stagingMemory, imageFile, size);
+
+  DestroyImageFile(imageFile);
+
+  // Image creation
+  //=================================================
+  uint32_t imageIdx = ImageManager::CreateImage(
+    static_cast<uint32_t>(width), static_cast<uint32_t>(height), VK_FORMAT_R8G8B8A8_UNORM,
+    VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  sklImage_t* img = ImageManager::images[imageIdx];
+
+  ImageManager::TransitionImageLayout(img->image, VK_FORMAT_R8G8B8A8_UNORM,
+                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  BufferManager::CopyBufferToImage(stagingBuffer, img->image, static_cast<uint32_t>(width),
+                                   static_cast<uint32_t>(height));
+  ImageManager::TransitionImageLayout(img->image, VK_FORMAT_R8G8B8A8_UNORM,
+                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  _bufferManager->RemoveAtIndex(stagingIndex);
+
+  img->view = ImageManager::CreateImageView(VK_FORMAT_R8G8B8A8_UNORM,
+                                            VK_IMAGE_ASPECT_COLOR_BIT, img->image);
+
+  img->sampler = ImageManager::CreateSampler();
+
+  tex->imageIndex = imageIdx;
+  textures.push_back(tex);
+  return static_cast<uint32_t>(textures.size() - 1);
+}

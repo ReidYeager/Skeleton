@@ -57,7 +57,7 @@ SklRenderBackend::~SklRenderBackend()
 
   CleanupRenderComponents();
 
-  vkDestroyCommandPool(vulkanContext.device, graphicsCommandPool, nullptr);
+  vkDestroyCommandPool(vulkanContext.device, vulkanContext.graphicsCommandPool, nullptr);
 
   vulkanContext.Cleanup();
   vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -234,7 +234,7 @@ void SklRenderBackend::ChoosePhysicalDevice(VkPhysicalDevice& _selectedDevice,
 
 void SklRenderBackend::CreateCommandPool()
 {
-  SklCreateCommandPool(graphicsCommandPool, vulkanContext.graphicsIdx);
+  SklCreateCommandPool(vulkanContext.graphicsCommandPool, vulkanContext.graphicsIdx);
 }
 
 //=================================================
@@ -391,8 +391,9 @@ void SklRenderBackend::CreateSwapchain()
   swapchainImageViews.resize(imageCount);
   for (uint32_t i = 0; i < imageCount; i++)
   {
-    swapchainImageViews[i] = CreateImageView(swapchainFormat, VK_IMAGE_ASPECT_COLOR_BIT,
-                                             swapchainImages[i]);
+    swapchainImageViews[i] =
+        ImageManager::CreateImageView(swapchainFormat, VK_IMAGE_ASPECT_COLOR_BIT,
+                                      swapchainImages[i]);
   }
 }
 
@@ -464,7 +465,8 @@ void SklRenderBackend::CreateDepthImage()
                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
   depthImage = ImageManager::images[i];
-  depthImage->view = CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage->image);
+  depthImage->view =
+    ImageManager::CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImage->image);
 }
 
 void SklRenderBackend::CreateFramebuffers()
@@ -550,7 +552,7 @@ void SklRenderBackend::CreateCommandBuffers()
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = bufferCount;
-  allocInfo.commandPool = graphicsCommandPool;
+  allocInfo.commandPool = vulkanContext.graphicsCommandPool;
 
   SKL_ASSERT_VK(
       vkAllocateCommandBuffers(vulkanContext.device, &allocInfo, commandBuffers.data()),
@@ -593,7 +595,7 @@ uint32_t SklRenderBackend::GetQueueIndex(std::vector<VkQueueFamilyProperties>& _
 }
 
 uint32_t SklRenderBackend::GetPresentIndex(const VkPhysicalDevice* _device,
-                                             uint32_t _queuePropertyCount, uint32_t _graphicsIndex)
+                                           uint32_t _queuePropertyCount, uint32_t _graphicsIndex)
 {
   uint32_t bestfit = -1;
   VkBool32 supported;
@@ -628,32 +630,6 @@ uint32_t SklRenderBackend::CreateImage(uint32_t _width, uint32_t _height, VkForm
                                        VkMemoryPropertyFlags _memFlags)
 {
   return ImageManager::CreateImage(_width, _height, _format, _tiling, _usage, _memFlags);
-}
-
-VkImageView SklRenderBackend::CreateImageView(const VkFormat _format, VkImageAspectFlags _aspect,
-                                              const VkImage& _image)
-{
-  VkImageViewCreateInfo createInfo = {};
-  createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  createInfo.subresourceRange.levelCount = 1;
-  createInfo.subresourceRange.baseMipLevel = 0;
-  createInfo.subresourceRange.layerCount = 1;
-  createInfo.subresourceRange.baseArrayLayer = 0;
-  createInfo.subresourceRange.aspectMask = _aspect;
-  createInfo.image = _image;
-  createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-  createInfo.format = _format;
-
-  VkImageView tmpView;
-  SKL_ASSERT_VK(
-      vkCreateImageView(vulkanContext.device, &createInfo, nullptr, &tmpView),
-      "Failed to create image view");
-
-  return tmpView;
 }
 
 VkFormat SklRenderBackend::FindDepthFormat()

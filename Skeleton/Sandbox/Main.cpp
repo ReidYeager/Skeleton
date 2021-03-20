@@ -3,7 +3,6 @@
 
 #include "skeleton.h"
 
-// TODO : Implement shader layout file handling
 // TODO : Define shader files/directory
 
 class sandboxApp : public Application

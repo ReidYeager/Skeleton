@@ -1,13 +1,13 @@
 
+#ifndef SKELETON_RENDERER_VULKAN_CONTEXT_H
+#define SKELETON_RENDERER_VULKAN_CONTEXT_H 1
+
 #include "vulkan/vulkan.h"
 
 #include "skeleton/renderer/shader_program.h"
 #include "skeleton/core/mesh.h"
 #include "skeleton/core/debug_tools.h"
 #include "skeleton/renderer/image.h"
-
-#ifndef SKELETON_RENDERER_VULKAN_CONTEXT_H
-#define SKELETON_RENDERER_VULKAN_CONTEXT_H 1
 
 // A buffer and its device memory
 struct sklBuffer_t
@@ -53,6 +53,8 @@ struct SklVulkanContext_t
   VkQueue graphicsQueue;
   VkQueue presentQueue;
   VkQueue transferQueue;
+
+  VkCommandPool graphicsCommandPool;
 
   std::vector<shader_t> shaders;
   std::vector<shaderProgram_t> shaderPrograms;

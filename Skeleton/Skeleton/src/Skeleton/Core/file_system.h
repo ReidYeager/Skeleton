@@ -1,4 +1,7 @@
 
+#ifndef SKELETON_CORE_FILE_SYSTEM_H
+#define SKELETON_CORE_FILE_SYSTEM_H 1
+
 #include <fstream>
 #include <vector>
 #include <string>
@@ -11,9 +14,6 @@
 #include "skeleton/core/debug_tools.h"
 #include "skeleton/core/time.h"
 #include "skeleton/renderer/render_backend.h"
-
-#ifndef SKELETON_CORE_FILE_SYSTEM_H
-#define SKELETON_CORE_FILE_SYSTEM_H 1
 
 // Loads a file's binary as a char array
 inline std::vector<char> LoadFile(const char* _directory)
@@ -101,15 +101,16 @@ inline mesh_t LoadMesh(const char* _directory, BufferManager* _bufferManager)
     }
   }
 
-  SKL_PRINT("Mesh", "%zd unique verts", mesh.verticies.size());
-
-  _bufferManager->CreateAndFillBuffer(
-      mesh.vertexBuffer, mesh.vertexBufferMemory, mesh.verticies.data(),
+  mesh.vertexBufferIndex = _bufferManager->CreateAndFillBuffer(mesh.verticies.data(),
       mesh.verticies.size() * sizeof(mesh.verticies[0]), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-  _bufferManager->CreateAndFillBuffer(
-      mesh.indexBuffer, mesh.indexBufferMemory, mesh.indices.data(),
+  mesh.indexBufferIndex = _bufferManager->CreateAndFillBuffer(mesh.indices.data(),
       mesh.indices.size() * sizeof(mesh.indices[0]), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+  mesh.vertexBuffer = _bufferManager->GetBuffer(mesh.vertexBufferIndex);
+  mesh.indexBuffer = _bufferManager->GetBuffer(mesh.indexBufferIndex);
+
+  SKL_PRINT("Mesh", "%zd unique verts -- %u, %u", mesh.verticies.size(), mesh.vertexBufferIndex, mesh.indexBufferIndex);
 
   return mesh;
 }

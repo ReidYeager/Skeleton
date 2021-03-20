@@ -1,8 +1,8 @@
 
-#include "glm/glm.hpp"
-
 #ifndef SKELETON_CORE_CAMERA_H
 #define SKELETON_CORE_CAMERA_H
+
+#include "glm/glm.hpp"
 
 // Contains all information required for rendering within a worldspace
 class Camera

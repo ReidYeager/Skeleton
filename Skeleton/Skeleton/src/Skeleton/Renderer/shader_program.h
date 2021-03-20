@@ -1,4 +1,7 @@
 
+#ifndef SKELETON_RENDERER_SHADER_PROGRAM_H
+#define SKELETON_RENDERER_SHADER_PROGRAM_H 1
+
 #include <vector>
 
 #include "vulkan/vulkan.h"
@@ -6,9 +9,6 @@
 //=================================================
 // PARALLEL PROGRAMS / SHADERS
 //=================================================
-
-#ifndef SKELETON_RENDERER_SHADER_PROGRAM_H
-#define SKELETON_RENDERER_SHADER_PROGRAM_H 1
 
 // TODO : Move to more general RENDERER file
 typedef uint32_t sklFlags;

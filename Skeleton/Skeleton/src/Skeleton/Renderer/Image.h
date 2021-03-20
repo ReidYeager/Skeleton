@@ -1,8 +1,8 @@
 
-#include "vulkan/vulkan.h"
-
 #ifndef SKELETON_RENDERER_IMAGE_H
 #define SKELETON_RENDERER_IMAGE_H 1
+
+#include "vulkan/vulkan.h"
 
 // Stores all information Vulkan needs to render an image
 struct sklImage_t

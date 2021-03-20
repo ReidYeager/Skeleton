@@ -1,4 +1,7 @@
 
+#ifndef SKELETON_RENDERER_RENDERER_H
+#define SKELETON_RENDERER_RENDERER_H 1
+
 #include <vector>
 
 #include "vulkan/vulkan.h"
@@ -9,9 +12,6 @@
 
 #include "skeleton/renderer/render_backend.h"
 #include "skeleton/core/camera.h"
-
-#ifndef SKELETON_RENDERER_RENDERER_H
-#define SKELETON_RENDERER_RENDERER_H 1
 
 class Renderer
 {
@@ -79,18 +79,17 @@ protected:
   //=================================================
 
   // Loads image from file to a texture
-  void CreateTextureImage(const char* _directory, VkImage& _image, VkImageView& _view,
-                                 VkDeviceMemory& _memory, VkSampler& _sampler);
+  void CreateTextureImage(const char* _directory);
 
   // Creates a generic imageSampler
-  VkSampler CreateSampler();
+  //VkSampler CreateSampler();
 
   // Changes the ImageLayout of an image via a commandBuffer
-  void TransitionImageLayout(VkImage _iamge, VkFormat _format,
-                             VkImageLayout _oldLayout, VkImageLayout _newLayout);
+  //void TransitionImageLayout(VkImage _iamge, VkFormat _format,
+  //                           VkImageLayout _oldLayout, VkImageLayout _newLayout);
 
   // Copies a VkBuffer to a VkImage
-  void CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width, uint32_t _height);
+  //void CopyBufferToImage(VkBuffer _buffer, VkImage _image, uint32_t _width, uint32_t _height);
 
 }; // Renderer
 
